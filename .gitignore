@@ -3,3 +3,4 @@ models/
 results/
 visualization/
 wandb/
+behavior_models/
