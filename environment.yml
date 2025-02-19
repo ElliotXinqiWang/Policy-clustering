@@ -29,6 +29,8 @@ dependencies:
   - xz=5.4.6=h5eee18b_0
   - zlib=1.2.13=h5eee18b_0
   - pip:
+    - "--pre"
+    - "--find-links=https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
     - absl-py==2.1.0
     - antlr4-python3-runtime==4.9.3
     - appdirs==1.4.4
@@ -93,7 +95,7 @@ dependencies:
     - markupsafe==2.1.5
     - matplotlib==3.8.4
     - mdurl==0.1.2
-    - mjrl==1.0.0
+    # - mjrl==1.0.0
     - ml-collections==0.1.1
     - ml-dtypes==0.4.0
     - msgpack==1.0.8

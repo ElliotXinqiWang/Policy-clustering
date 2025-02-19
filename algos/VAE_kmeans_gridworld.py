@@ -455,7 +455,7 @@ if __name__ == "__main__":
         config.disable_jit = True
     wandb.init(
         project=config.project,
-        entity="elliotxinqiwang",#!/bin/bash
+        entity="huhaoo",#!/bin/bash
         group=config.group,
         name=config.name,
         config=config,

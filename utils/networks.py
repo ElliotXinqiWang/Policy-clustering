@@ -244,6 +244,38 @@ class ContinuousDecoder(nn.Module):
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
         return pi
 
+class StateDecoder(nn.Module):
+    state_dim: int  # action space dimension
+
+    @nn.compact
+    def __call__(self, z, x):
+        obs, dones = x # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
+        z = jnp.expand_dims(z, axis=0)  # z: (1, batch_size, latent_dim)
+        z = jnp.broadcast_to(z, (obs.shape[0], *z.shape[1:]))  # z: (seq_len, batch_size, latent_dim)
+        
+        embedding=obs
+        embedding = nn.Dense(
+            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(embedding)
+        embedding = nn.relu(embedding)
+        embedding = jnp.concatenate([embedding, z], axis=-1)
+        embedding = nn.Dense(
+            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(embedding)
+        embedding = nn.relu(embedding)
+
+        # print(embedding.shape,self.state_dim)
+        
+        state = nn.Dense(self.state_dim, bias_init=constant(0.0))(embedding)
+        return state # (seq_len, batch_size, state_dim)
+
+#         state_std  = nn.Dense(self.state_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
+#         state_std = jax.nn.softplus(state_std) + 1e-5
+#         state_mean = nn.Dense(self.state_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
+# 
+#         return (state_mean, state_std) # (seq_len, batch_size, state_dim)
+
+
 class DiscretePolicyVAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
@@ -264,6 +296,30 @@ class DiscretePolicyVAE(nn.Module):
         z = self.reparameterize(mu, log_var, rng)  # Reparameterization
         pi = self.decoder(z, x)  # Decode
         return pi, mu, log_var
+
+class DiscretePolicyWithNextStateVAE(nn.Module):
+    latent_dim: int
+    Encoder_hidden_dim: int
+    action_dim: int
+    state_dim: int
+
+    def setup(self):
+        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        self.decoder = Decoder(self.action_dim)
+        self.state_decoder = StateDecoder(self.state_dim)
+
+    def reparameterize(self, mu, log_var, rng):
+        """Reparameterization trick."""
+        std = jnp.exp(0.5 * log_var)
+        eps = jax.random.normal(rng, mu.shape)
+        return mu + eps * std
+
+    def __call__(self, x, rng):
+        mu, log_var = self.encoder(x)  # Encode
+        z = self.reparameterize(mu, log_var, rng)  # Reparameterization
+        pi = self.decoder(z, x)  # Decode
+        state = self.state_decoder(z, x)
+        return pi, state, mu, log_var
 
 class ContinuousPolicyVAE(nn.Module):
     latent_dim: int
