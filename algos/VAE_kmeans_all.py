@@ -85,6 +85,8 @@ class TrainConfig:
     group: str = "PKmeans"
     name: str = ""
 
+    take_ball_target: int = 0
+
     def __post_init__(self):
         # self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
         self.name = f"{self.name}-{self.env}-{self.K_value}"
@@ -348,14 +350,17 @@ def train(config):
 
     idx = jax.random.permutation(rng, len(dataset.obs))
     dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
-    data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
+    # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
     data_idx = data_idx[idx]
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
-        
+    DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
+    if config.env in DiscreteEnvNames:
+        vae = DiscretePolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
+    else:
+        vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
 
     # Initialize model and optimizer
-    vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     rng, init_rng = jax.random.split(rng)
@@ -400,6 +405,7 @@ def train(config):
                 kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
                 done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
                 done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
+                print(action.shape)
                 recon_loss = -pi.log_prob(action)
                 recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                 loss = recon_loss + config.vae_kl_weight * kl_loss.mean()
@@ -484,7 +490,7 @@ if __name__ == "__main__":
         config.disable_jit = True
     wandb.init(
         project=config.project,
-        entity="elliotxinqiwang",#!/bin/bash
+        entity="policy-clustering",#!/bin/bash
         group=config.group,
         name=config.name,
         config=config,

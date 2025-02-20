@@ -39,9 +39,11 @@ rule_based_dataset_files=(
     "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl"
     "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl"
 )
+SELECTED_GPU=$(python scripts/select_gpu.py)
+echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     echo "Running VAE + Kmeans"
-    CUDA_VISIBLE_DEVICES=2 python algos/VAE_kmeans_gridworld.py \
+    CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans_all.py \
         --env "$env_name" \
         --seed "$seed" \
         --project "0128VAE_${env_name}" \

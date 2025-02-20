@@ -12,8 +12,8 @@ env_name="walker2d-medium-expert-v2"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-seeds=(0 1 2 3 4)
-# seeds=(0)
+# seeds=(0 1 2 3 4)
+seeds=(0)
 k_values=(10 12 15)
 rule_based_dataset_files=(
     "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
@@ -36,10 +36,12 @@ rule_based_dataset_files=(
     # "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl"
     # "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl"
 )
+SELECTED_GPU=$(python scripts/select_gpu.py)
+echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     for k in "${k_values[@]}"; do
         echo "Running DEC"
-        CUDA_VISIBLE_DEVICES=3 python algos/DEC_all.py \
+        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/DEC_all.py \
             --env "${env_name}" \
             --seed "$seed" \
             --project "0129DEC_different K" \
