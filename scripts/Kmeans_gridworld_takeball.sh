@@ -28,10 +28,12 @@ rule_based_dataset_files=(
     "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl"
     "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl"
 )
+SELECTED_GPU=$(python select_gpu.py)
+echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     for k in "${Kvalues[@]}"; do
         echo "Running Kmeans with k=$k"
-        CUDA_VISIBLE_DEVICES=0 python algos/Kmeans_original_gridworld.py \
+        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/Kmeans_original_gridworld.py \
             --env "$env_name" \
             --K_value "$k" \
             --seed "$seed" \

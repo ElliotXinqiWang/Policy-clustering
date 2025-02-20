@@ -4,3 +4,5 @@ results/
 visualization/
 wandb/
 behavior_models/
+*.pyc
+__pycache__/
