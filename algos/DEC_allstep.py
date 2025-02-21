@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import h5py
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, EncoderWrapper, DiscreteDEC, ContinuousDEC
+from utils.networks import DiscreteDEC_allstep, ContinuousDEC_allstep
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
@@ -351,9 +351,10 @@ def train(config):
     # Initialize model and optimizer
     True_k_value = int(jnp.max(data_idx)) + 1
     if config.env in D4RL_envs:
-        model = ContinuousDEC(latent_dim=config.vae_latent_dim, n_clusters=config.K_value, action_dim=config.action_dim)
+        model = ContinuousDEC_allstep(latent_dim=config.vae_latent_dim, n_clusters=config.K_value, action_dim=config.action_dim)
+        # raise NotImplementedError
     else:
-        model = DiscreteDEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim)
+        model = DiscreteDEC_allstep(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim)
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     rng, init_rng = jax.random.split(rng)
@@ -400,11 +401,11 @@ def train(config):
                 recon_loss = -x_hat.log_prob(action)
                 recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                 # calculate clustering loss
-                p = (q ** 2) / jnp.sum(q, axis=0)
-                p = p / jnp.sum(p, axis=1, keepdims=True)
-                kl_loss = -jnp.sum(p * jnp.log((p + 1e-8)/q), axis=1)
+                p = (q ** 2) / jnp.sum(q, axis=1, keepdims=True)
+                p = p / jnp.sum(p, axis=2, keepdims=True)
+                kl_loss = -jnp.sum(p * jnp.log((p + 1e-8)/q), axis=2)
                 
-                loss = recon_loss + config.vae_kl_weight * kl_loss.mean()
+                loss = recon_loss + config.vae_kl_weight * jnp.sum(kl_loss*done_mask) / jnp.sum(done_mask)
                 return loss
             grad_fn = jax.value_and_grad(loss_fn)
             rng, vae_rng = jax.random.split(rng)
@@ -429,7 +430,11 @@ def train(config):
     # Encode data into latent space
     @jax.jit
     def get_prediction(params, x, rng):
+        obs, done = x
+        done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+        done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
         pi, q, z = model.apply(params, x, rng)
+        q = jnp.sum(jnp.log(q)*done_mask[:,:,None], axis=0)
         return jnp.argmax(q, axis=1)
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)

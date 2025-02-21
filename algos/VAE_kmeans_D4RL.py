@@ -261,6 +261,8 @@ def train(config):
     rng = jax.random.PRNGKey(config.seed)
     np.random.seed(config.seed)
     
+    # print(config.env)
+    # raise NotImplementedError
     env = gym.make(config.env)
     config.action_dim = env.action_space.shape[0]
     config.state_dim = env.observation_space.shape[0]
@@ -451,7 +453,7 @@ if __name__ == "__main__":
         config.disable_jit = True
     wandb.init(
         project=config.project,
-        entity="elliotxinqiwang",#!/bin/bash
+        entity="policy-clustering",#!/bin/bash
         group=config.group,
         name=config.name,
         config=config,

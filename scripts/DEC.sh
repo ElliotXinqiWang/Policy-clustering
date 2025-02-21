@@ -1,10 +1,10 @@
 #!/bin/bash"
-# env_name="halfcheetah-medium-expert-v2"
+env_name="halfcheetah-medium-expert-v2"
 # env_name="hopper-medium-expert-v2"
 # env_name="ant-medium-expert-v2"
 # env_name="walker2d-medium-expert-v2"
 # env_name="MiniGrid-Reacher-MDP"
-env_name="MDPtakeball"
+# env_name="MDPtakeball"
 
 # dataset="expert"
 # dataset="medium-expert"
@@ -41,7 +41,7 @@ echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     for k in "${k_values[@]}"; do
         echo "Running DEC"
-        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/DEC_all.py \
+        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/DEC.py \
             --env "${env_name}" \
             --seed "$seed" \
             --project "0129DEC_different K" \
