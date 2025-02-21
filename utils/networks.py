@@ -427,6 +427,7 @@ class ContinuousDecoderA(nn.Module):
         actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
         
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
+        return pi
     
 class DiscreteDEC_allstep(nn.Module):
     latent_dim: int

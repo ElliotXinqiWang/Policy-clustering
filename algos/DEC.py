@@ -402,8 +402,9 @@ def train(config):
                 # calculate clustering loss
                 p = (q ** 2) / jnp.sum(q, axis=0)
                 p = p / jnp.sum(p, axis=1, keepdims=True)
-                kl_loss = -jnp.sum(p * jnp.log((p + 1e-8)/q), axis=1)
+                kl_loss = jnp.sum(p * jnp.log((p + 1e-8)/q), axis=1)
                 
+                # jax.debug.print("recon_loss: {}, kl_loss: {} ", recon_loss, kl_loss.mean())
                 loss = recon_loss + config.vae_kl_weight * kl_loss.mean()
                 return loss
             grad_fn = jax.value_and_grad(loss_fn)

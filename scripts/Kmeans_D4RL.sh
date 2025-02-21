@@ -1,7 +1,7 @@
 #!/bin/bash
 # env_name="halfcheetah"
-# env_name="hopper"
-env_name="ant"
+env_name="hopper"
+# env_name="ant"
 # env_name="walker2d"
 
 # dataset="expert"
