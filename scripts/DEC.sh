@@ -13,8 +13,9 @@ env_name="halfcheetah-medium-expert-v2"
 # dataset="medium"
 # dataset="random"
 # seeds=(0 1 2 3 4)
-seeds=(0)
-k_values=(10 12 15)
+seeds=(1)
+# k_values=(10 12 15)
+k_values=(5)
 rule_based_dataset_files=(
     # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
@@ -45,7 +46,7 @@ for seed in "${seeds[@]}"; do
             --env "${env_name}" \
             --seed "$seed" \
             --project "0129DEC_different K" \
-            --max_updates 300 \
+            --max_updates 50 \
             --K_value "$k" \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"
     done

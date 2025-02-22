@@ -403,7 +403,8 @@ def train(config):
                 # calculate clustering loss
                 p = (q ** 2) / jnp.sum(q, axis=1, keepdims=True)
                 p = p / jnp.sum(p, axis=2, keepdims=True)
-                kl_loss = -jnp.sum(p * jnp.log((p + 1e-8)/q), axis=2)
+                p = jax.lax.stop_gradient(p)
+                kl_loss = jnp.sum(p * jnp.log((p + 1e-8)/q), axis=2)
                 
                 loss = recon_loss + config.vae_kl_weight * jnp.sum(kl_loss*done_mask) / jnp.sum(done_mask)
                 return loss
