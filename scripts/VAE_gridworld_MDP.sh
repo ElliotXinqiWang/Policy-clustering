@@ -14,8 +14,8 @@ env_name="MiniGrid-Reacher-MDP"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-seeds=(0 1)
-k_values=(5 7)
+seeds=(0 1 2)
+k_values=(5 7 10)
 rule_based_dataset_files=(
     "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
     "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
@@ -40,6 +40,7 @@ rule_based_dataset_files=(
 
 mkdir logs
 
+set -x
 SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
@@ -56,3 +57,5 @@ for seed in "${seeds[@]}"; do
 
     done
 done
+echo "Done"
+python scripts/make_sheet.py ${#seeds[@]} ${#k_values[@]} ${seeds[@]} ${k_values[@]}
