@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, ContinuousPolicyVAE, EncoderWrapper
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, ContinuousPolicyVAE, EncoderWrapper,VQVAE
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
@@ -74,7 +74,7 @@ class TrainConfig:
     learning_rate: float = 1e-3
     adam_eps: float = 1e-8
     # Kmeans
-    K_value: int = 5 # Number of clusters
+    k_value: int = 5 # Number of clusters
     max_traj_len: int = 20  # Max trajectory length
     normalize: bool = True  # Normalize states
     # vae
@@ -84,12 +84,13 @@ class TrainConfig:
     project: str = "1017VAEKmeans"
     group: str = "PKmeans"
     name: str = ""
+    vqvae: bool = False
 
     take_ball_target: int = 0
 
     def __post_init__(self):
         # self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
-        self.name = f"{self.name}-{self.env}-{self.K_value}"
+        self.name = f"{self.name}-{self.env}-{self.k_value}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
             
@@ -355,17 +356,24 @@ def train(config):
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
-    if config.env in DiscreteEnvNames:
-        vae = DiscretePolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
+    if config.vqvae:
+        vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim,
+                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value)
     else:
-        vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
+        if config.env in DiscreteEnvNames:
+            vae = DiscretePolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
+        else:
+            vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
 
     # Initialize model and optimizer
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     rng, init_rng = jax.random.split(rng)
     rng, reparam_rng = jax.random.split(rng)
-    network_params = vae.init(init_rng, ac_init_in, reparam_rng)
+    if config.vqvae:
+        network_params = vae.init(init_rng, ac_init_in)
+    else:
+        network_params = vae.init(init_rng, ac_init_in, reparam_rng)
     
     # Initialize optimizer
     tx = optax.chain(
@@ -381,8 +389,7 @@ def train(config):
     
     paded_size = math.ceil(len(dataset.obs) / config.batch_size) * config.batch_size
     # Training step
-    @jax.jit
-    def epoch_step(runner_state): 
+    def epoch_step_func(runner_state, method='vae'): 
         train_state, obs, action, reward, done, rng = runner_state
         rng, shuffle_rng = jax.random.split(rng) 
         shuffle_idx = jax.random.permutation(shuffle_rng, len(obs))
@@ -401,15 +408,22 @@ def train(config):
             train_state, rng = train_state_rng
             def loss_fn(params, batch, rng):
                 obs, action, reward, done = batch
-                pi, mu, log_var = vae.apply(params, (obs, done), rng)
-                kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
                 done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
                 done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
-                print(action.shape)
-                recon_loss = -pi.log_prob(action)
-                recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
-                loss = recon_loss + config.vae_kl_weight * kl_loss.mean()
-                return loss
+                if method == 'vae':
+                    pi, mu, log_var = vae.apply(params, (obs, done), rng)
+                    recon_loss = -pi.log_prob(action)
+                    recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
+                    kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
+                    print(action.shape)
+                    return recon_loss + config.vae_kl_weight * kl_loss.mean()
+                elif method == 'vqvae':
+                    pi, z, loss = vae.apply(params, (obs, done))
+                    recon_loss = -pi.log_prob(action)
+                    recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
+                    return loss + recon_loss
+                else:
+                    raise ValueError("Unknown method: ", method)
             grad_fn = jax.value_and_grad(loss_fn)
             rng, vae_rng = jax.random.split(rng)
             loss, grad = grad_fn(train_state.params, batch, vae_rng)
@@ -418,11 +432,12 @@ def train(config):
         train_state_rng, loss = jax.lax.scan(train_one_batch, (train_state, rng), trainset)
         train_state, rng = train_state_rng
         return train_state, loss.mean()
+    epoch_step=jax.jit(epoch_step_func, static_argnames=('method'))
     
     loss_history = []
     for i in range(config.max_updates):
         rng, update_rng = jax.random.split(rng)
-        train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, update_rng))
+        train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, update_rng), method='vqvae' if config.vqvae else 'vae')
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
         wandb.log({"Loss": loss})
@@ -431,23 +446,29 @@ def train(config):
     print("Training finished after ", i, " updates")
     
     # Encode data into latent space
-    @jax.jit
-    def encode(params, x, rng):
-        pi, mu, log_var = vae.apply(params, x, rng)
-        std = jnp.exp(0.5 * log_var)
-        eps = jax.random.normal(rng, mu.shape)
-        return mu + eps * std
+    def encode_func(params, x, rng, method='vae'):
+        if method == 'vae':
+            pi, mu, log_var = vae.apply(params, x, rng)
+            std = jnp.exp(0.5 * log_var)
+            eps = jax.random.normal(rng, mu.shape)
+            return mu + eps * std
+        elif method == 'vqvae':
+            pi, z, loss = vae.apply(params, x)
+            return z
+        else:
+            raise ValueError("Unknown method: ", method)
+    encode = jax.jit(encode_func, static_argnames=('method'))
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)
-    latent_representations = encode(train_state.params, (pred_obs, pred_done), rng)
+    latent_representations = encode(train_state.params, (pred_obs, pred_done), rng, method='vqvae' if config.vqvae else 'vae')
 
     # Perform KMeans clustering
     if not config.true_k_available:
-        kmeans = KMeans(n_clusters=config.K_value, random_state=42)
+        kmeans = KMeans(n_clusters=config.k_value, random_state=42)
         labels = kmeans.fit_predict(latent_representations)
     else:
         true_k = int(jnp.max(data_idx)) + 1
-        config.K_value = true_k
+        config.k_value = true_k
         kmeans = KMeans(n_clusters=true_k, random_state=42)
         labels = kmeans.fit_predict(latent_representations)
     predicted_labels = labels
@@ -456,14 +477,14 @@ def train(config):
     print(f"NMI: {nmi}, ARI: {ari}")
     wandb.log({"NMI": nmi, "ARI": ari})
     
-    dataset_idxs = [jnp.where(predicted_labels == i)[0] for i in range(config.K_value)]
+    dataset_idxs = [jnp.where(predicted_labels == i)[0] for i in range(config.k_value)]
     num_catagories = int(jnp.max(data_idx)) + 1
-    heatmap_matrix = np.zeros((config.K_value, num_catagories))
-    for i in range(config.K_value):
+    heatmap_matrix = np.zeros((config.k_value, num_catagories))
+    for i in range(config.k_value):
         for j in range(num_catagories):
             heatmap_matrix[i, j] = jnp.sum(data_idx[dataset_idxs[i]] == j)
     
-    plot_save_path = f"results/{config.alg}/{config.env}/{config.K_value}/plots"
+    plot_save_path = f"results/{config.alg}/{config.env}/{config.k_value}/plots"
     if not os.path.exists(plot_save_path):
         os.makedirs(plot_save_path)
     dataset_categorical_image = plot_and_save_heatmap(

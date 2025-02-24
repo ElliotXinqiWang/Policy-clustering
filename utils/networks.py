@@ -187,7 +187,7 @@ class Encoder(nn.Module):
         # Compute latent space parameters
         mu = nn.Dense(self.latent_dim)(needed_embedding)
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
-        return mu, log_var
+        return mu, log_var # (batch_size, latent_dim)
         
 
 class Decoder(nn.Module):
@@ -285,6 +285,37 @@ class ContinuousPolicyVAE(nn.Module):
         z = self.reparameterize(mu, log_var, rng)  # Reparameterization
         pi = self.decoder(z, x)  # Decode
         return pi, mu, log_var
+
+class VQVAE(nn.Module):
+    latent_dim: int
+    Encoder_hidden_dim: int
+    action_dim: int
+    discrete_policy: bool
+    k: int
+    beta: float = 0.25
+
+    def setup(self):
+        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.discrete_policy:
+            self.decoder = Decoder(self.action_dim)
+        else:
+            self.decoder = ContinuousDecoder(self.action_dim)
+        self.codebook = self.param('codebook', jax.nn.initializers.normal(), (self.k, self.latent_dim))
+
+    def reparameterize(self, z):
+        euc_dis = jnp.sum((z[:,None,:] - self.codebook[None,:,:])**2, axis=-1)
+        z_q = jnp.argmin(euc_dis, axis=-1)
+        z_q = self.codebook[z_q]
+        loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 + \
+               jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
+        return z + jax.lax.stop_gradient(z_q - z), loss
+
+    def __call__(self, x):
+        mu, log_var = self.encoder(x)  # Encode
+        z, loss = self.reparameterize(mu)  # Reparameterization
+        print(mu.shape,z.shape)
+        pi = self.decoder(z, x)  # Decode
+        return pi, z, loss
 
 
 class EncoderWrapper(nn.Module):
