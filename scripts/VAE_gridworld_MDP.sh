@@ -40,7 +40,7 @@ rule_based_dataset_files=(
 
 mkdir logs
 
-set -x
+# set -x
 SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do

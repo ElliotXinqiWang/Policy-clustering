@@ -12,9 +12,11 @@ dataset="medium-expert"
 # dataset="random"
 # seeds=(0 1 2 3 4 5 6 7 8 9)
 seeds=(0)
+SELECTED_GPU=$(python scripts/select_gpu.py)
+echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     echo "Running VAE + Kmeans"
-    CUDA_VISIBLE_DEVICES=3 python algos/VAE_kmeans_D4RL.py \
+    CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans_all.py \
         --env "${env_name}-${dataset}-v2" \
         --seed "$seed" \
         --project "0129VAE_D4RL" \
