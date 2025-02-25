@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, ContinuousPolicyVAE, EncoderWrapper,VQVAE
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, ContinuousPolicyVAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
@@ -84,7 +84,11 @@ class TrainConfig:
     project: str = "1017VAEKmeans"
     group: str = "PKmeans"
     name: str = ""
-    vqvae: bool = False
+    algo: str = "vae"
+    vqvae_codebook: int = -1
+    vqvae_alpha: float = 1
+    vqvae_beta: float = 0.25
+    vqvae_entropy_weight: float = 0.1
 
     take_ball_target: int = 0
 
@@ -113,7 +117,6 @@ class Transitions(NamedTuple):
     action: jnp.ndarray = field(default_factory=lambda: jnp.empty((0,)))
     reward: jnp.ndarray = field(default_factory=lambda: jnp.empty((0,)))
     done: jnp.ndarray = field(default_factory=lambda: jnp.empty((0,)))
-    
     
 def parse_args_and_update_config(config_class):
     parser = argparse.ArgumentParser()
@@ -215,7 +218,6 @@ def load_rule_based_datasets(config):
     )
     return dataset, jnp.concatenate([jnp.ones(len(datasets[i].obs)) * i for i in range(len(datasets))])
     
-
 def load_datasets(config):
     datasets = []
     for i, path in enumerate(config.dataset_paths):
@@ -356,24 +358,29 @@ def train(config):
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
-    if config.vqvae:
-        vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim,
-                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value)
-    else:
+    if config.algo == "vae":
         if config.env in DiscreteEnvNames:
             vae = DiscretePolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
         else:
             vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
-
+    elif config.algo == "vqvae":
+        vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
+                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)
+    elif config.algo == "vqvae_gumble_softmax":
+        vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim,
+                                   discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
+                                   k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)                    
     # Initialize model and optimizer
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     rng, init_rng = jax.random.split(rng)
     rng, reparam_rng = jax.random.split(rng)
-    if config.vqvae:
-        network_params = vae.init(init_rng, ac_init_in)
-    else:
+    if config.algo == "vae":
         network_params = vae.init(init_rng, ac_init_in, reparam_rng)
+    elif config.algo == "vqvae":
+        network_params = vae.init(init_rng, ac_init_in)
+    elif config.algo == "vqvae_gumble_softmax":
+        network_params = vae.init(init_rng, ac_init_in, reparam_rng, 0)
     
     # Initialize optimizer
     tx = optax.chain(
@@ -389,7 +396,7 @@ def train(config):
     
     paded_size = math.ceil(len(dataset.obs) / config.batch_size) * config.batch_size
     # Training step
-    def epoch_step_func(runner_state, method='vae'): 
+    def epoch_step_func(runner_state, iter, method='vae'): 
         train_state, obs, action, reward, done, rng = runner_state
         rng, shuffle_rng = jax.random.split(rng) 
         shuffle_idx = jax.random.permutation(shuffle_rng, len(obs))
@@ -422,6 +429,14 @@ def train(config):
                     recon_loss = -pi.log_prob(action)
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     return loss + recon_loss
+                elif method == 'vqvae_gumble_softmax':
+                    pi, zq, ze, loss = vae.apply(params, (obs, done), rng, iter)
+                    recon_loss = -pi.log_prob(action)
+                    recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
+                    s=jnp.mean(ze,axis=(0))
+                    # jax.debug.print("s.sum:{}",s.sum())
+                    entropy= -jnp.sum(s*jnp.log(s+1e-8),axis=(0))
+                    return loss + recon_loss - config.vqvae_entropy_weight * entropy
                 else:
                     raise ValueError("Unknown method: ", method)
             grad_fn = jax.value_and_grad(loss_fn)
@@ -437,7 +452,7 @@ def train(config):
     loss_history = []
     for i in range(config.max_updates):
         rng, update_rng = jax.random.split(rng)
-        train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, update_rng), method='vqvae' if config.vqvae else 'vae')
+        train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, update_rng), i, method=config.algo)
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
         wandb.log({"Loss": loss})
@@ -455,12 +470,15 @@ def train(config):
         elif method == 'vqvae':
             pi, z, loss = vae.apply(params, x)
             return z
+        elif method == 'vqvae_gumble_softmax':
+            pi, zq, ze,  loss = vae.apply(params, x, rng, 0)
+            return zq
         else:
             raise ValueError("Unknown method: ", method)
     encode = jax.jit(encode_func, static_argnames=('method'))
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)
-    latent_representations = encode(train_state.params, (pred_obs, pred_done), rng, method='vqvae' if config.vqvae else 'vae')
+    latent_representations = encode(train_state.params, (pred_obs, pred_done), rng, method=config.algo)
 
     # Perform KMeans clustering
     if not config.true_k_available:

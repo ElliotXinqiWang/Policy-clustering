@@ -34,7 +34,6 @@ class ScannedRNN(nn.Module):
         # Use a dummy key since the default state init fn is just zeros.
         cell = nn.GRUCell(features=hidden_size)
         return cell.initialize_carry(jax.random.PRNGKey(seed), (batch_size, hidden_size))
-
 class DiscreteActorRNN(nn.Module):
     """
     Discrete actor network with RNN.
@@ -74,8 +73,6 @@ class DiscreteActorRNN(nn.Module):
     
     def _get_probability_of_traj(self, hidden, actions, obs, dones):
         raise NotImplementedError("This function is not implemented for the discrete actor.")
-    
-
 class ContinuousActorRNN(nn.Module):
     """
     Continuous actor network with RNN.
@@ -118,7 +115,6 @@ class ContinuousActorRNN(nn.Module):
         pi = distrax.MultivariateNormalDiag(loc=action_logits, scale_diag=actor_std)
 
         return hidden, pi
-    
 class ActorCriticRNN(nn.Module):
     action_dim: int
     config: Dict 
@@ -152,8 +148,6 @@ class ActorCriticRNN(nn.Module):
         )
         
         return hidden, pi, jnp.squeeze(critic, axis=-1)
-   
-   
 class Encoder(nn.Module):
     latent_dim: int  # Latent space dimension
     hidden_dim: int  # Hidden state dimension
@@ -188,8 +182,6 @@ class Encoder(nn.Module):
         mu = nn.Dense(self.latent_dim)(needed_embedding)
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
         return mu, log_var # (batch_size, latent_dim)
-        
-
 class Decoder(nn.Module):
     action_dim: int  # action space dimension
 
@@ -214,7 +206,6 @@ class Decoder(nn.Module):
         
         pi = distrax.Categorical(logits=actor_logits)
         return pi
-
 class ContinuousDecoder(nn.Module):
     action_dim: int  # action space dimension
 
@@ -243,7 +234,6 @@ class ContinuousDecoder(nn.Module):
         
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
         return pi
-
 class DiscretePolicyVAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
@@ -264,7 +254,6 @@ class DiscretePolicyVAE(nn.Module):
         z = self.reparameterize(mu, log_var, rng)  # Reparameterization
         pi = self.decoder(z, x)  # Decode
         return pi, mu, log_var
-
 class ContinuousPolicyVAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
@@ -285,13 +274,13 @@ class ContinuousPolicyVAE(nn.Module):
         z = self.reparameterize(mu, log_var, rng)  # Reparameterization
         pi = self.decoder(z, x)  # Decode
         return pi, mu, log_var
-
 class VQVAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
     action_dim: int
     discrete_policy: bool
     k: int
+    alpha: float = 1
     beta: float = 0.25
 
     def setup(self):
@@ -300,13 +289,13 @@ class VQVAE(nn.Module):
             self.decoder = Decoder(self.action_dim)
         else:
             self.decoder = ContinuousDecoder(self.action_dim)
-        self.codebook = self.param('codebook', jax.nn.initializers.normal(), (self.k, self.latent_dim))
+        self.codebook = self.param('codebook', nn.initializers.normal(1), (self.k, self.latent_dim))
 
     def reparameterize(self, z):
         euc_dis = jnp.sum((z[:,None,:] - self.codebook[None,:,:])**2, axis=-1)
         z_q = jnp.argmin(euc_dis, axis=-1)
         z_q = self.codebook[z_q]
-        loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 + \
+        loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \
                jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
         return z + jax.lax.stop_gradient(z_q - z), loss
 
@@ -316,8 +305,44 @@ class VQVAE(nn.Module):
         print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
         return pi, z, loss
+class VQVAE_gumble_softmax(nn.Module):
+    latent_dim: int
+    Encoder_hidden_dim: int
+    action_dim: int
+    discrete_policy: bool
+    k: int
+    alpha: float = 1
+    beta: float = 0.25
 
+    def setup(self):
+        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.discrete_policy:
+            self.decoder = Decoder(self.action_dim)
+        else:
+            self.decoder = ContinuousDecoder(self.action_dim)
+        self.codebook = self.param('codebook', nn.initializers.normal(1), (self.k, self.latent_dim))
 
+    def temp(self,it):
+        return 0.1+0.9*(0.95**it)
+
+    def reparameterize(self, z, rng, it):
+        euc_dis = -jnp.sum((z[:,None,:] - self.codebook[None,:,:])**2, axis=-1)
+        # gumbel_noise = jax.random.gumbel(rng, shape=euc_dis.shape)
+        # euc_dis = (euc_dis + gumbel_noise) / self.temp(it)
+        euc_dis = euc_dis / self.temp(it)
+        z_e = jax.nn.softmax(euc_dis)
+        z_q = jnp.argmax(z_e, axis=-1)
+        z_q = self.codebook[z_q]
+        loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \
+               jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
+        return z + jax.lax.stop_gradient(z_q - z), z_e, loss
+
+    def __call__(self, x, rng, it):
+        mu, log_var = self.encoder(x)  # Encode
+        zq, ze, loss = self.reparameterize(mu, rng, it)  # Reparameterization
+        print(mu.shape,zq.shape,ze.shape)
+        pi = self.decoder(zq, x)  # Decode
+        return pi, zq, ze, loss
 class EncoderWrapper(nn.Module):
     latent_dim: int
     hidden_dim: int
@@ -327,7 +352,6 @@ class EncoderWrapper(nn.Module):
 
     def __call__(self, x):
         return self.encoder(x)
-    
 class ClusteringLayer(nn.Module):
     n_clusters: int
     latent_dim: int
@@ -344,7 +368,6 @@ class ClusteringLayer(nn.Module):
         q = 1.0 / (1.0 + jnp.sum((z[:, None, :] - self.centers[None, :, :]) ** 2, axis=2))
         q = q / jnp.sum(q, axis=1, keepdims=True)
         return q
-    
 class ContinuousDEC(nn.Module):
     latent_dim: int
     n_clusters: int
@@ -363,7 +386,6 @@ class ContinuousDEC(nn.Module):
         q = self.cluster_layer(z)
         x_hat = self.decoder(z, x)
         return x_hat, q, z
-    
 class DiscreteDEC(nn.Module):
     latent_dim: int
     n_clusters: int
@@ -383,8 +405,6 @@ class DiscreteDEC(nn.Module):
         q = self.cluster_layer(z)
         x_hat = self.decoder(z, x)
         return x_hat, q, z
-
-
 class EncoderA(nn.Module):
     latent_dim: int  # Latent space dimension
     hidden_dim: int  # Hidden state dimension
@@ -410,7 +430,6 @@ class EncoderA(nn.Module):
         # Compute latent space parameters
         m = nn.Dense(self.latent_dim)(embedding)
         return m
-
 class DecoderA(nn.Module):
     action_dim: int  # action space dimension
 
@@ -432,7 +451,6 @@ class DecoderA(nn.Module):
         
         pi = distrax.Categorical(logits=actor_logits)
         return pi
-
 class ContinuousDecoderA(nn.Module):
     action_dim: int  # action space dimension
 
@@ -459,7 +477,6 @@ class ContinuousDecoderA(nn.Module):
         
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
         return pi
-    
 class DiscreteDEC_allstep(nn.Module):
     latent_dim: int
     n_clusters: int
@@ -480,7 +497,6 @@ class DiscreteDEC_allstep(nn.Module):
         # q = jnp.sum(jnp.log(q), axis=0)
         x_hat = self.decoder(z, x)
         return x_hat, q, z
-    
 class ContinuousDEC_allstep(nn.Module):
     latent_dim: int
     n_clusters: int
