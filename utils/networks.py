@@ -25,7 +25,7 @@ class ScannedRNN(nn.Module):
             self.initialize_carry(carry.shape[0], carry.shape[1]),
             rnn_state,
         )
-        rnn_state = self.initialize_carry(carry.shape[0], carry.shape[1])
+        # rnn_state = self.initialize_carry(carry.shape[0], carry.shape[1])
         new_rnn_state, y = nn.GRUCell(features=ins.shape[1])(rnn_state, ins)
         return new_rnn_state, y
 
@@ -234,34 +234,18 @@ class ContinuousDecoder(nn.Module):
         
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
         return pi
-class DiscretePolicyVAE(nn.Module):
+class VAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
     action_dim: int
+    discrete_action: bool
 
     def setup(self):
         self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
-        self.decoder = Decoder(self.action_dim)
-
-    def reparameterize(self, mu, log_var, rng):
-        """Reparameterization trick."""
-        std = jnp.exp(0.5 * log_var)
-        eps = jax.random.normal(rng, mu.shape)
-        return mu + eps * std
-
-    def __call__(self, x, rng):
-        mu, log_var = self.encoder(x)  # Encode
-        z = self.reparameterize(mu, log_var, rng)  # Reparameterization
-        pi = self.decoder(z, x)  # Decode
-        return pi, mu, log_var
-class ContinuousPolicyVAE(nn.Module):
-    latent_dim: int
-    Encoder_hidden_dim: int
-    action_dim: int
-
-    def setup(self):
-        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
-        self.decoder = ContinuousDecoder(self.action_dim)
+        if self.discrete_action:
+            self.decoder = Decoder(self.action_dim)
+        else:
+            self.decoder = ContinuousDecoder(self.action_dim)
 
     def reparameterize(self, mu, log_var, rng):
         """Reparameterization trick."""

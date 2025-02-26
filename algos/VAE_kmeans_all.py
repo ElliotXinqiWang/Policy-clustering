@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, ContinuousPolicyVAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
@@ -88,7 +88,7 @@ class TrainConfig:
     vqvae_codebook: int = -1
     vqvae_alpha: float = 1
     vqvae_beta: float = 0.25
-    vqvae_entropy_weight: float = 0.1
+    vqvae_entropy_weight: float = 1
 
     take_ball_target: int = 0
 
@@ -327,6 +327,21 @@ def train(config):
             data = pickle.load(f)
             dataset = data["dataset"]
             data_idx = data["data_idx"]
+    # fdebug=open("logs/debug.txt","w")
+    # for i in range(len(dataset.obs)):
+    #     if data_idx[i]<0.5:
+    #         print(i,file=fdebug)
+    #         print(jnp.transpose(dataset.obs[i][:6].reshape(6,9,9,3),axes=(0,3,2,1))[:,1,:,:],file=fdebug)
+    #         print(dataset.action[i][:6],file=fdebug)
+    #         break
+    # print(file=fdebug)
+    # for i in range(len(dataset.obs)):
+    #     if data_idx[i]>0.5:
+    #         print(i,file=fdebug)
+    #         print(jnp.transpose(dataset.obs[i][:6].reshape(6,9,9,3),axes=(0,3,2,1))[:,1,:,:],file=fdebug)
+    #         print(dataset.action[i][:6],file=fdebug)
+    #         break
+    # exit(0)
     print("Dataset loaded, dataset size: ", dataset.obs.shape[0])
     # set the last done to be True if the episode is not done
     dataset = dataset._replace(done=jnp.concatenate([dataset.done[:, :-1], jnp.ones_like(dataset.done[:, -1:])], axis=1))
@@ -359,10 +374,7 @@ def train(config):
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
     if config.algo == "vae":
-        if config.env in DiscreteEnvNames:
-            vae = DiscretePolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
-        else:
-            vae = ContinuousPolicyVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim)
+        vae = VAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim, discrete_action=(config.env in DiscreteEnvNames))
     elif config.algo == "vqvae":
         vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                     discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)
@@ -435,7 +447,8 @@ def train(config):
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     s=jnp.mean(ze,axis=(0))
                     # jax.debug.print("s.sum:{}",s.sum())
-                    entropy= -jnp.sum(s*jnp.log(s+1e-8),axis=(0))
+                    entropy= -jnp.sum(s*jnp.log(s+1e-8))
+                    # entropy= jnp.sum(jnp.log(s+1e-8))
                     return loss + recon_loss - config.vqvae_entropy_weight * entropy
                 else:
                     raise ValueError("Unknown method: ", method)

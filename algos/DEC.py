@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import h5py
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscretePolicyVAE, EncoderWrapper, DiscreteDEC, ContinuousDEC
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DiscreteDEC, ContinuousDEC
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
