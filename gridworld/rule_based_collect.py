@@ -22,7 +22,7 @@ class CollectConfig:
     filename: str = "extra_good.pkl"  # Where to save the collected data
     merge_interval: int = 128  # How many episodes to merge into a single batch
     # env_kwargs
-    epsilon: float = 0.3
+    epsilon: float = 0.1
     extra_reward: float = 10.0
     MDP_reacher_agent_mode: str = "balanced"
     take_ball_target: int = 0

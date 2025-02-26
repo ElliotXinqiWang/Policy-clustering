@@ -18,9 +18,9 @@ seeds=(0)
 k_values=(5)
 codebook=16
 rule_based_dataset_files=(
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
     "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl"
     "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_8000.pkl"
@@ -52,12 +52,13 @@ for seed in "${seeds[@]}"; do
             --env "$env_name" \
             --seed "$seed" \
             --project "0128VAE_${env_name}" \
-            --max_updates 200 \
+            --max_updates 100 \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"\
             --k "$k"\
             --vqvae_codebook "$codebook"\
             --algo "vqvae"\
             # --algo "vqvae_gumble_softmax" --batch_size 1024\
+            # --true_k_available False\
 
     done
 done

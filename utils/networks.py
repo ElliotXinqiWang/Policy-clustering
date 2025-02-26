@@ -314,7 +314,8 @@ class VQVAE_gumble_softmax(nn.Module):
         # gumbel_noise = jax.random.gumbel(rng, shape=euc_dis.shape)
         # euc_dis = (euc_dis + gumbel_noise) / self.temp(it)
         euc_dis = euc_dis / self.temp(it)
-        z_e = jax.nn.softmax(euc_dis)
+        # z_e = jax.nn.softmax(euc_dis)
+        z_e = jax.random.categorical(rng, euc_dis)
         z_q = jnp.argmax(z_e, axis=-1)
         z_q = self.codebook[z_q]
         loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \

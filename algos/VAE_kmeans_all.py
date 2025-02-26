@@ -216,6 +216,7 @@ def load_rule_based_datasets(config):
         reward=jnp.concatenate([dataset.reward for dataset in datasets], axis=0),
         done=jnp.concatenate([dataset.done for dataset in datasets], axis=0),
     )
+    # print(dataset.obs.shape, dataset.action.shape, dataset.reward.shape, dataset.done.shape)
     return dataset, jnp.concatenate([jnp.ones(len(datasets[i].obs)) * i for i in range(len(datasets))])
     
 def load_datasets(config):
@@ -366,10 +367,10 @@ def train(config):
     # Shuffle the dataset
     dataset = dataset._replace(obs=(dataset.obs - state_mean) / state_std)
 
-    idx = jax.random.permutation(rng, len(dataset.obs))
-    dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
+    # idx = jax.random.permutation(rng, len(dataset.obs))
+    # dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
     # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    data_idx = data_idx[idx]
+    # data_idx = data_idx[idx]
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
@@ -442,7 +443,7 @@ def train(config):
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     return loss + recon_loss
                 elif method == 'vqvae_gumble_softmax':
-                    pi, zq, ze, loss = vae.apply(params, (obs, done), rng, iter)
+                    pi, zq, ze, loss = vae.apply(params, (obs, done), rng, 0)
                     recon_loss = -pi.log_prob(action)
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     s=jnp.mean(ze,axis=(0))
@@ -450,6 +451,7 @@ def train(config):
                     entropy= -jnp.sum(s*jnp.log(s+1e-8))
                     # entropy= jnp.sum(jnp.log(s+1e-8))
                     return loss + recon_loss - config.vqvae_entropy_weight * entropy
+                    # return - config.vqvae_entropy_weight * entropy
                 else:
                     raise ValueError("Unknown method: ", method)
             grad_fn = jax.value_and_grad(loss_fn)
@@ -474,7 +476,7 @@ def train(config):
     print("Training finished after ", i, " updates")
     
     # Encode data into latent space
-    def encode_func(params, x, rng, method='vae'):
+    def encode_func(params, x, act, rng, method='vae'):
         if method == 'vae':
             pi, mu, log_var = vae.apply(params, x, rng)
             std = jnp.exp(0.5 * log_var)
@@ -482,6 +484,12 @@ def train(config):
             return mu + eps * std
         elif method == 'vqvae':
             pi, z, loss = vae.apply(params, x)
+            # (obs, done) = x
+            # done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+            # done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
+            # recon_loss = -pi.log_prob(act)
+            # recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
+            # jax.debug.print("{}",recon_loss)
             return z
         elif method == 'vqvae_gumble_softmax':
             pi, zq, ze,  loss = vae.apply(params, x, rng, 0)
@@ -491,7 +499,7 @@ def train(config):
     encode = jax.jit(encode_func, static_argnames=('method'))
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)
-    latent_representations = encode(train_state.params, (pred_obs, pred_done), rng, method=config.algo)
+    latent_representations = encode(train_state.params, (pred_obs, pred_done), jnp.swapaxes(dataset.action,0,1), rng, method=config.algo)
 
     # Perform KMeans clustering
     if not config.true_k_available:

@@ -1,9 +1,9 @@
 #!/bin/bash"
-# env_name="halfcheetah-medium-expert-v2"
+env_name="halfcheetah-medium-expert-v2"
 # env_name="hopper-medium-expert-v2"
 # env_name="ant-medium-expert-v2"
 # env_name="walker2d-medium-expert-v2"
-env_name="MiniGrid-Reacher-MDP"
+# env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
 
 # dataset="expert"
@@ -12,8 +12,8 @@ env_name="MiniGrid-Reacher-MDP"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-# seeds=(0 1 2 3 4)
-seeds=(1)
+seeds=(0 1 2)
+# seeds=(1)
 # k_values=(10 12 15)
 k_values=(5)
 rule_based_dataset_files=(
@@ -46,7 +46,7 @@ for seed in "${seeds[@]}"; do
             --env "${env_name}" \
             --seed "$seed" \
             --project "0129DEC_different K" \
-            --max_updates 100 \
+            --max_updates 400 \
             --K_value "$k" \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"
     done

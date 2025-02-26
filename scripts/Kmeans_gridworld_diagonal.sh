@@ -19,9 +19,9 @@ seeds=(0)
 Kvalues=(5)
 # Kvalues=(8) # for debugging
 rule_based_dataset_files=(
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
-    # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
     "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl"
     "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_8000.pkl"
