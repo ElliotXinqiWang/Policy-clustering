@@ -1,9 +1,9 @@
-#!/bin/bash"
-env_name="halfcheetah-medium-expert-v2"
+#in/bash"
+# env_name="halfcheetah-medium-expert-v2"
 # env_name="hopper-medium-expert-v2"
 # env_name="ant-medium-expert-v2"
 # env_name="walker2d-medium-expert-v2"
-# env_name="MiniGrid-Reacher-MDP"
+env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
 
 # dataset="expert"
@@ -12,8 +12,8 @@ env_name="halfcheetah-medium-expert-v2"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-seeds=(0 1 2)
-# seeds=(1)
+# seeds=(0 1 2)
+seeds=(10)
 # k_values=(10 12 15)
 k_values=(5)
 rule_based_dataset_files=(

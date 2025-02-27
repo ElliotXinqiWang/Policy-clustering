@@ -1,6 +1,6 @@
 #!/bin/bash"
-# env_name="halfcheetah"
-env_name="hopper"
+env_name="halfcheetah"
+# env_name="hopper"
 # env_name="ant"
 # env_name="walker2d"
 
@@ -17,11 +17,11 @@ SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     echo "Running VAE + Kmeans"
-    CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans_all.py \
+    CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans.py \
         --env "${env_name}-${dataset}-v2" \
         --seed "$seed" \
         --project "0129VAE_D4RL" \
-        --max_updates 200 \
+        --max_updates 1000 \
         --vqvae_codebook "$codebook"\
         # --algo "vqvae_gumble_softmax" --batch_size 256\
         --algo "vqvae"\

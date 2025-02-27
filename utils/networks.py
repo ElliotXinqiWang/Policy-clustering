@@ -1,6 +1,6 @@
 from flax import linen as nn
 import functools
-from flax.linen.initializers import constant, orthogonal
+from flax.linen.initializers import constant, orthogonal, normal
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -153,13 +153,27 @@ class Encoder(nn.Module):
     hidden_dim: int  # Hidden state dimension
 
     @nn.compact
-    def __call__(self, x):
-        obs, dones = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
+    def __call__(self, x, act):
+        obs, dones = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size), act: (seq_len, batch_size) or (seq_len, batch_size, act_dim)
+        act=act.reshape(act.shape[0],act.shape[1],-1)
 
         # Embedding layer
+        embedding_obs = obs
+        embedding_obs = nn.Dense(
+            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(embedding_obs)
+        embedding_obs = nn.relu(embedding_obs)
+        # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        
+        embedding_act = act
+        embedding_act = nn.relu(nn.Dense(16)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(64)(embedding_act))
+
+        embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
+        # embedding = embedding_obs
         embedding = nn.Dense(
             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
+        )(embedding)
         embedding = nn.relu(embedding)
 
         # RNN hidden state initialization
@@ -176,7 +190,7 @@ class Encoder(nn.Module):
 
         # Select embeddings based on first_done
         batch_indices = jnp.arange(batch_size)
-        needed_embedding = embedding[first_done, batch_indices]
+        needed_embedding = embedding[first_done-1, batch_indices]
 
         # Compute latent space parameters
         mu = nn.Dense(self.latent_dim)(needed_embedding)
@@ -242,10 +256,7 @@ class VAE(nn.Module):
 
     def setup(self):
         self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
-        if self.discrete_action:
-            self.decoder = Decoder(self.action_dim)
-        else:
-            self.decoder = ContinuousDecoder(self.action_dim)
+        self.decoder = Decoder(self.action_dim) if self.discrete_action else ContinuousDecoder(self.action_dim)
 
     def reparameterize(self, mu, log_var, rng):
         """Reparameterization trick."""
@@ -253,8 +264,8 @@ class VAE(nn.Module):
         eps = jax.random.normal(rng, mu.shape)
         return mu + eps * std
 
-    def __call__(self, x, rng):
-        mu, log_var = self.encoder(x)  # Encode
+    def __call__(self, x, act, rng):
+        mu, log_var = self.encoder(x, act)  # Encode
         z = self.reparameterize(mu, log_var, rng)  # Reparameterization
         pi = self.decoder(z, x)  # Decode
         return pi, mu, log_var
@@ -283,8 +294,8 @@ class VQVAE(nn.Module):
                jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
         return z + jax.lax.stop_gradient(z_q - z), loss
 
-    def __call__(self, x):
-        mu, log_var = self.encoder(x)  # Encode
+    def __call__(self, x, act):
+        mu, log_var = self.encoder(x, act)  # Encode
         z, loss = self.reparameterize(mu)  # Reparameterization
         print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
@@ -322,8 +333,8 @@ class VQVAE_gumble_softmax(nn.Module):
                jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
         return z + jax.lax.stop_gradient(z_q - z), z_e, loss
 
-    def __call__(self, x, rng, it):
-        mu, log_var = self.encoder(x)  # Encode
+    def __call__(self, x, act, rng, it):
+        mu, log_var = self.encoder(x, act)  # Encode
         zq, ze, loss = self.reparameterize(mu, rng, it)  # Reparameterization
         print(mu.shape,zq.shape,ze.shape)
         pi = self.decoder(zq, x)  # Decode
@@ -353,152 +364,116 @@ class ClusteringLayer(nn.Module):
         q = 1.0 / (1.0 + jnp.sum((z[:, None, :] - self.centers[None, :, :]) ** 2, axis=2))
         q = q / jnp.sum(q, axis=1, keepdims=True)
         return q
-class ContinuousDEC(nn.Module):
+class DEC(nn.Module):
     latent_dim: int
     n_clusters: int
     action_dim: int
+    discrete_action: bool
 
     def setup(self):
         self.encoder = Encoder(self.latent_dim, 32)
         self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
-        self.decoder = ContinuousDecoder(self.action_dim)
+        self.decoder = Decoder(self.action_dim) if self.discrete_action else ContinuousDecoder(self.action_dim)
 
     def encode(self, x):
         return self.encoder.encoder(x)[0]
 
-    def __call__(self, x, rng):
-        z = self.encoder(x)[0]
+    def __call__(self, x, act, rng):
+        z = self.encoder(x, act)[0]
         q = self.cluster_layer(z)
         x_hat = self.decoder(z, x)
         return x_hat, q, z
-class DiscreteDEC(nn.Module):
-    latent_dim: int
-    n_clusters: int
-    action_dim: int
 
-    def setup(self):
-        self.encoder = Encoder(self.latent_dim, 32)
-        self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
-        self.decoder = Decoder(self.action_dim)
-
-    def encode(self, x):
-        return self.encoder.encoder(x)[0]
-
-    # q (batch_size, n_clusters)
-    def __call__(self, x, rng):
-        z = self.encoder(x)[0]
-        q = self.cluster_layer(z)
-        x_hat = self.decoder(z, x)
-        return x_hat, q, z
-class EncoderA(nn.Module):
-    latent_dim: int  # Latent space dimension
-    hidden_dim: int  # Hidden state dimension
-
-    @nn.compact
-    def __call__(self, x):
-        obs, dones = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
-
-        # Embedding layer
-        embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-
-        # RNN hidden state initialization
-        batch_size = embedding.shape[1]
-        hidden = ScannedRNN.initialize_carry(batch_size, self.hidden_dim)
-
-        # RNN processing
-        rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN()(hidden, rnn_in)
-
-        # Compute latent space parameters
-        m = nn.Dense(self.latent_dim)(embedding)
-        return m
-class DecoderA(nn.Module):
-    action_dim: int  # action space dimension
-
-    @nn.compact
-    def __call__(self, z, x):
-        obs, dones = x # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
-        
-        embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-        embedding = nn.Dense(
-            32, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
-        embedding = jnp.concatenate([embedding, z], axis=-1)
-        
-        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
-        
-        pi = distrax.Categorical(logits=actor_logits)
-        return pi
-class ContinuousDecoderA(nn.Module):
-    action_dim: int  # action space dimension
-
-    @nn.compact
-    def __call__(self, z, x):
-        obs, dones = x # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
-
-        
-        embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
-        embedding = nn.Dense(
-            32, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding)
-        embedding = nn.relu(embedding)
-        embedding = jnp.concatenate([embedding, z], axis=-1)
-        actor_std = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )(embedding)
-        actor_std = jax.nn.softplus(actor_std) + 1e-5
-        
-        actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
-        
-        pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
-        return pi
-class DiscreteDEC_allstep(nn.Module):
-    latent_dim: int
-    n_clusters: int
-    action_dim: int
-
-    def setup(self):
-        self.encoder = EncoderA(self.latent_dim, 32)
-        self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
-        self.decoder = DecoderA(self.action_dim)
-
-    # def encode(self, x):
-    #     return self.encoder.encoder(x)[0]
-
-    # q (seq_len, batch_size, n_clusters)
-    def __call__(self, x, rng):
-        z = self.encoder(x)
-        q = jax.vmap(self.cluster_layer, in_axes=(0,))(z)
-        # q = jnp.sum(jnp.log(q), axis=0)
-        x_hat = self.decoder(z, x)
-        return x_hat, q, z
-class ContinuousDEC_allstep(nn.Module):
-    latent_dim: int
-    n_clusters: int
-    action_dim: int
-
-    def setup(self):
-        self.encoder = EncoderA(self.latent_dim, 32)
-        self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
-        self.decoder = ContinuousDecoderA(self.action_dim)
-
-    # def encode(self, x):
-    #     return self.encoder.encoder(x)[0]
-
-    # q (seq_len, batch_size, n_clusters)
-    def __call__(self, x, rng):
-        z = self.encoder(x)
-        q = jax.vmap(self.cluster_layer, in_axes=(0,))(z)
-        # q = jnp.sum(jnp.log(q), axis=0)
-        x_hat = self.decoder(z, x)
-        return x_hat, q, z
+# class EncoderA(nn.Module):
+#     latent_dim: int  # Latent space dimension
+#     hidden_dim: int  # Hidden state dimension
+# 
+#     @nn.compact
+#     def __call__(self, x):
+#         obs, dones = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
+# 
+#         # Embedding layer
+#         embedding = nn.Dense(
+#             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+#         )(obs)
+#         embedding = nn.relu(embedding)
+# 
+#         # RNN hidden state initialization
+#         batch_size = embedding.shape[1]
+#         hidden = ScannedRNN.initialize_carry(batch_size, self.hidden_dim)
+# 
+#         # RNN processing
+#         rnn_in = (embedding, dones)
+#         hidden, embedding = ScannedRNN()(hidden, rnn_in)
+# 
+#         # Compute latent space parameters
+#         m = nn.Dense(self.latent_dim)(embedding)
+#         return m
+# class DecoderA(nn.Module):
+#     action_dim: int  # action space dimension
+# 
+#     @nn.compact
+#     def __call__(self, z, x):
+#         obs, dones = x # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
+#         
+#         embedding = nn.Dense(
+#             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+#         )(obs)
+#         embedding = nn.relu(embedding)
+#         embedding = nn.Dense(
+#             32, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+#         )(embedding)
+#         embedding = nn.relu(embedding)
+#         embedding = jnp.concatenate([embedding, z], axis=-1)
+#         
+#         actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
+#         
+#         pi = distrax.Categorical(logits=actor_logits)
+#         return pi
+# class ContinuousDecoderA(nn.Module):
+#     action_dim: int  # action space dimension
+# 
+#     @nn.compact
+#     def __call__(self, z, x):
+#         obs, dones = x # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size)
+# 
+#         
+#         embedding = nn.Dense(
+#             128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+#         )(obs)
+#         embedding = nn.relu(embedding)
+#         embedding = nn.Dense(
+#             32, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+#         )(embedding)
+#         embedding = nn.relu(embedding)
+#         embedding = jnp.concatenate([embedding, z], axis=-1)
+#         actor_std = nn.Dense(
+#             self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+#         )(embedding)
+#         actor_std = jax.nn.softplus(actor_std) + 1e-5
+#         
+#         actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
+#         
+#         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
+#         return pi
+# class DEC_allstep(nn.Module):
+#     latent_dim: int
+#     n_clusters: int
+#     action_dim: int
+#     discrete_action: bool
+# 
+#     def setup(self):
+#         self.encoder = EncoderA(self.latent_dim, 32)
+#         self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
+#         self.decoder = DecoderA(self.action_dim) if self.discrete_action else ContinuousDecoderA(self.action_dim)
+# 
+#     # def encode(self, x):
+#     #     return self.encoder.encoder(x)[0]
+# 
+#     # q (seq_len, batch_size, n_clusters)
+#     def __call__(self, x, rng):
+#         z = self.encoder(x)
+#         q = jax.vmap(self.cluster_layer, in_axes=(0,))(z)
+#         # q = jnp.sum(jnp.log(q), axis=0)
+#         x_hat = self.decoder(z, x)
+#         return x_hat, q, z

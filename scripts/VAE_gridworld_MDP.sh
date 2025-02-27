@@ -48,7 +48,7 @@ for seed in "${seeds[@]}"; do
     for k in "${k_values[@]}"; do
         echo "Running VAE + Kmeans with k=$k, seed=$seed"
         # CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans_all.py >logs/$seed-$k-out.txt 2>logs/$seed-$k-err.txt \
-        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans_all.py \
+        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/VAE_kmeans.py \
             --env "$env_name" \
             --seed "$seed" \
             --project "0128VAE_${env_name}" \

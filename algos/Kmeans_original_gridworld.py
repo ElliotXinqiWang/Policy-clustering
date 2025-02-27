@@ -405,7 +405,6 @@ def train(config):
                     h_state, pi = model.apply(params, h_state, (obs, done))
                     # mask out the probs strictly after first done (exclusive)
                     done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
-                    done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
                     loss = -pi.log_prob(action)
                     loss = jnp.sum(done_mask * loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     return loss
@@ -493,7 +492,6 @@ def train(config):
             # prob = jnp.where(prob > -0.3, 0, -1) # shape: (max_traj_len, batch_size)
             
             done_mask = jnp.cumprod(1 - dones.astype(jnp.int32), axis=0)
-            done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]])
             # traj_prob = jnp.sum(prob * done_mask, axis=0)
             # traj_prob = jnp.mean(prob * done_mask, axis=0)
             traj_prob = jnp.sum(prob * done_mask, axis=0) / jnp.sum(done_mask, axis=0)
@@ -699,7 +697,6 @@ def train(config):
         # done_mask = jnp.cumprod(1 - evaluated_reward[0].astype(jnp.int32), axis=0)
         dones, rewards = evaluated_reward
         done_mask = jnp.cumprod(1 - dones.astype(jnp.int32), axis=0)
-        done_mask = jnp.concatenate([jnp.ones_like(done_mask[:1]), done_mask[:-1]], axis=0)
         evaluated_returns = jnp.sum(rewards * done_mask, axis=0)
         return evaluated_returns
     
