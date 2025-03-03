@@ -1,6 +1,6 @@
 from flax import linen as nn
 import functools
-from flax.linen.initializers import constant, orthogonal, normal
+from flax.linen.initializers import constant, orthogonal, normal, he_normal, he_uniform
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -159,15 +159,12 @@ class Encoder(nn.Module):
 
         # Embedding layer
         embedding_obs = obs
-        embedding_obs = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(embedding_obs)
-        embedding_obs = nn.relu(embedding_obs)
+        embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
         # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
         
         embedding_act = act
-        embedding_act = nn.relu(nn.Dense(16)(embedding_act))
-        embedding_act = nn.relu(nn.Dense(64)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(32)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(128)(embedding_act))
 
         embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
         # embedding = embedding_obs
@@ -186,11 +183,13 @@ class Encoder(nn.Module):
 
         # Index first 'done'
         first_done = jnp.argmax(dones, axis=0)
-        first_done = jnp.where(jnp.any(dones, axis=0), first_done, obs.shape[0] - 1)
+        first_done = jnp.where(jnp.any(dones, axis=0), first_done, obs.shape[0])
 
         # Select embeddings based on first_done
         batch_indices = jnp.arange(batch_size)
         needed_embedding = embedding[first_done-1, batch_indices]
+        # needed_embedding = jnp.concatenate([needed_embedding,embedding[first_done//2, batch_indices],embedding[first_done*3//4, batch_indices]], axis=-1)
+        # needed_embedding = nn.relu(nn.Dense(128)(needed_embedding))
 
         # Compute latent space parameters
         mu = nn.Dense(self.latent_dim)(needed_embedding)
@@ -215,6 +214,10 @@ class Decoder(nn.Module):
         )(embedding)
         embedding = nn.relu(embedding)
         embedding = jnp.concatenate([embedding, z], axis=-1)
+        embedding = nn.sigmoid(nn.Dense(32)(embedding))
+        embedding = nn.LayerNorm()(embedding)
+        embedding = nn.sigmoid(nn.Dense(32)(embedding))
+        # embedding = nn.LayerNorm()(embedding)
         
         actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(embedding)
         

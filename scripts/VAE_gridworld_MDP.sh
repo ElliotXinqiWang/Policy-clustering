@@ -14,8 +14,9 @@ env_name="MiniGrid-Reacher-MDP"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
+codebook=-1
 seeds=(0)
-k_values=(5)
+k_values=(8)
 codebook=16
 rule_based_dataset_files=(
     "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
@@ -52,8 +53,9 @@ for seed in "${seeds[@]}"; do
             --env "$env_name" \
             --seed "$seed" \
             --project "0128VAE_${env_name}" \
-            --max_updates 100 \
+            --max_updates 400 \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"\
+            --learning_rate 2e-4\
             --k "$k"\
             --vqvae_codebook "$codebook"\
             --algo "vqvae"\

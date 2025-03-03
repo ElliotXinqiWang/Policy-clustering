@@ -226,6 +226,11 @@ def train(config):
     # set the last done to be True if the episode is not done
     dataset = dataset._replace(done=jnp.concatenate([dataset.done[:, :-1], jnp.ones_like(dataset.done[:, -1:])], axis=1))
     
+    if config.true_k_available:
+        true_k = int(jnp.max(data_idx)) + 1
+        config.k_value = true_k
+    print("Run on config: ", config)
+    
     # filter out episodes with short length, which can be easily learned by the network
     traj_lengths = jnp.argmax(dataset.done, axis=1) + 1
     # needed_episode_idx = jnp.where(total_return > 0.6)[0]
@@ -379,14 +384,8 @@ def train(config):
     latent_representations = encode(train_state.params, (pred_obs, pred_done), jnp.swapaxes(dataset.action,0,1), rng, method=config.algo)
 
     # Perform KMeans clustering
-    if not config.true_k_available:
-        kmeans = KMeans(n_clusters=config.k_value, random_state=42)
-        labels = kmeans.fit_predict(latent_representations)
-    else:
-        true_k = int(jnp.max(data_idx)) + 1
-        config.k_value = true_k
-        kmeans = KMeans(n_clusters=true_k, random_state=42)
-        labels = kmeans.fit_predict(latent_representations)
+    kmeans = KMeans(n_clusters=true_k, random_state=42)
+    labels = kmeans.fit_predict(latent_representations)
     predicted_labels = labels
     nmi = normalized_mutual_info_score(data_idx, predicted_labels)
     ari = adjusted_rand_score(data_idx, predicted_labels)

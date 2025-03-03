@@ -1,9 +1,9 @@
 #in/bash"
-# env_name="halfcheetah-medium-expert-v2"
+env_name="halfcheetah-medium-expert-v2"
 # env_name="hopper-medium-expert-v2"
 # env_name="ant-medium-expert-v2"
 # env_name="walker2d-medium-expert-v2"
-env_name="MiniGrid-Reacher-MDP"
+# env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
 
 # dataset="expert"

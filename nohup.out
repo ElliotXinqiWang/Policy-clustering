@@ -1,0 +1,13 @@
+python: can't open file '/homes/gws/hhu22/Policy-clustering/select_gpu.py': [Errno 2] No such file or directory
+Selected GPU: 
+Running Kmeans with k=5
+wandb: Currently logged in as: huhaoo (policy-clustering). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.19.7 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.16.6
+wandb: Run data is saved locally in /homes/gws/hhu22/Policy-clustering/wandb/run-20250227_161616-vho00vk9
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run -MDPtakeball-5
+wandb: ⭐️ View project at https://wandb.ai/policy-clustering/0124Kmeans_fixed_takeball_rule_based_small
+wandb: 🚀 View run at https://wandb.ai/policy-clustering/0124Kmeans_fixed_takeball_rule_based_small/runs/vho00vk9
+CUDA backend failed to initialize: jaxlib/cuda/versions_helpers.cc:98: operation cuInit(0) failed: CUDA_ERROR_NO_DEVICE (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)

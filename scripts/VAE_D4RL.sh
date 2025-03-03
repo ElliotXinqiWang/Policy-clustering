@@ -23,7 +23,8 @@ for seed in "${seeds[@]}"; do
         --project "0129VAE_D4RL" \
         --max_updates 1000 \
         --vqvae_codebook "$codebook"\
-        # --algo "vqvae_gumble_softmax" --batch_size 256\
         --algo "vqvae"\
+        --learning_rate 2e-4\
+        # --algo "vqvae_gumble_softmax" --batch_size 256\
 
 done
