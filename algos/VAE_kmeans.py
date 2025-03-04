@@ -68,6 +68,7 @@ class TrainConfig:
         "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
     ])
     dataset_sizes: list[int] = field(default_factory=lambda: [5, 5, 5])
+    extra_reward: float = 10.0
     epsilon: float = 0.1
     # Network
     hidden_dim: int = 64
@@ -198,7 +199,7 @@ def train(config):
         print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
         print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
         data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"]:
+    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"] or config.load_from_rule_based_dataset:
         dataset, data_idx = load_rule_based_datasets(config)
     elif not os.path.exists("datasets/" + dataset_filename):
         dataset, data_idx = load_datasets(config)
@@ -354,7 +355,7 @@ def train(config):
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
         wandb.log({"Loss": loss})
-        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4:
+        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
             break
     print("Training finished after ", i, " updates")
     

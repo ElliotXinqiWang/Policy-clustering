@@ -294,7 +294,8 @@ class VQVAE(nn.Module):
         z_q = jnp.argmin(euc_dis, axis=-1)
         z_q = self.codebook[z_q]
         loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \
-               jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta
+               jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta * self.alpha
+        # return z, loss
         return z + jax.lax.stop_gradient(z_q - z), loss
 
     def __call__(self, x, act):

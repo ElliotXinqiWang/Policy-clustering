@@ -25,10 +25,12 @@ rule_based_dataset_files=(
     # "datasets/rule_based/MiniGrid-Reacher-extra-bad/batch_2000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-extra-med/batch_2000.pkl"
 )
+SELECTED_GPU=$(python scripts/select_gpu.py)
+echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     for k in "${Kvalues[@]}"; do
         echo "Running Kmeans with k=$k"
-        CUDA_VISIBLE_DEVICES=2 python algos/Kmeans_original_gridworld.py \
+        CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/Kmeans_original_gridworld.py \
             --env "$env_name" \
             --K_value "$k" \
             --seed "$seed" \
