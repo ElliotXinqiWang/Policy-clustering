@@ -56,6 +56,7 @@ for seed in "${seeds[@]}"; do
             --max_updates 400 \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"\
             --learning_rate 2e-4\
+            --vqvae_alpha 100\
             --k "$k"\
             --vqvae_codebook "$codebook"\
             --algo "vqvae"\
