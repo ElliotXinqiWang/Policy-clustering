@@ -7,7 +7,8 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 
 random.seed()
-runtimes=16
+runtimes=256
+# runtimes=1
 vqvae_alpha=100
 vqvae_beta=1
 codebook=16
@@ -18,12 +19,14 @@ learning_rate=2e-4
 encoder_hidden_dim=32
 encoder_attention_features_dim=4
 algo="vqvae"
+project="vae_v1.11"
 batch_size=512
+vqvae_modify_use_sigma=True
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
-# env_name="MiniGrid-Reacher-extra-good"
-env_name="halfcheetah"
+env_name="MiniGrid-Reacher-extra-good"
+# env_name="halfcheetah"
 
 if env_name == "MiniGrid-Reacher-MDP":
     rule_based_dataset_files=[
@@ -56,17 +59,20 @@ else:
 def log_uniform(mi,mx):
     return mi*math.exp(random.random()*math.log(mx/mi))
 def rand_hypers():
-    global seed,codebook,vqvae_beta,vqvae_alpha,encoder_attention,encoder_hidden_dim,encoder_attention_features_dim,learning_rate
+    global seed,codebook,vqvae_beta,vqvae_alpha,encoder_attention,encoder_hidden_dim
+    global encoder_attention_features_dim,learning_rate,vqvae_modify_use_sigma
     seed = random.randint(0,2**30-1)
     codebook = 2**random.randint(3,6)
     vqvae_beta = log_uniform(0.1,10)
     vqvae_alpha = log_uniform(1e-1,1e4)
-    encoder_attention = random.choice([True,True,False])
+    encoder_attention = random.choice([True,False])
     if encoder_attention:
         encoder_hidden_dim = random.choice([1,8,32])
         encoder_attention_features_dim = random.choice([1,4,16])
         if encoder_attention_features_dim > encoder_hidden_dim:
             encoder_attention_features_dim = 1
+    if algo=="vqvae_modify":
+        vqvae_modify_use_sigma = random.choice([False])
     learning_rate = log_uniform(1e-5,1e-2)
 
 for _ in range(runtimes):
@@ -74,7 +80,7 @@ for _ in range(runtimes):
     command= f"CUDA_VISIBLE_DEVICES={gpuid} python algos/VAE_kmeans.py "
     command+=f"--env {env_name} "
     command+=f"--seed {seed} "
-    command+=f"--project {algo} "
+    command+=f"--project {project} "
     command+=f"--max_updates {max_updates} "
     command+=f"--vqvae_codebook {codebook} "
     command+=f"--vqvae_alpha {vqvae_alpha} "
@@ -84,9 +90,12 @@ for _ in range(runtimes):
     if load_from_rule_based_dataset:
         command+=f"--load_from_rule_based_dataset True "
         command+=f"--rule_based_dataset_files {' '.join(rule_based_dataset_files)} "
-    command+=f"--encoder_attention {encoder_attention} "
-    command+=f"--encoder_attention_features_dim {encoder_attention_features_dim} "
-    command+=f"--encoder_hidden_dim {encoder_hidden_dim} "
+    if encoder_attention:
+        command+=f"--encoder_attention True "
+        command+=f"--encoder_attention_features_dim {encoder_attention_features_dim} "
+        command+=f"--encoder_hidden_dim {encoder_hidden_dim} "
+    if algo=="vqvae_modify" and vqvae_modify_use_sigma:
+        command+=f"--vqvae_modify_use_sigma True "
     command+=f"--batch_size {batch_size} "
     print(command)
     os.system(command)

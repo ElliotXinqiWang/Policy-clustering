@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,VQVAE_modify
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 from utils.load_dataset import load_datasets, load_rule_based_datasets, Transitions
@@ -94,6 +94,7 @@ class TrainConfig:
     encoder_attention: bool = False
     encoder_hidden_dim: int = 32
     encoder_attention_features_dim: int = 4
+    vqvae_modify_use_sigma: bool = False
 
     take_ball_target: int = 0
 
@@ -262,7 +263,14 @@ def train(config):
     elif config.algo == "vqvae_gumble_softmax":
         vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim,
                                    discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
-                                   k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)                    
+                                   k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)    
+    elif config.algo == "vqvae_modify":
+        vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
+                           discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
+                           attention=config.encoder_attention, encoder_attention_features_dim=config.encoder_attention_features_dim,
+                           use_sigma=config.vqvae_modify_use_sigma)
+    else:
+        raise ValueError("Unknown algo: ", config.algo)
     # Initialize model and optimizer
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
@@ -271,7 +279,7 @@ def train(config):
     rng, reparam_rng = jax.random.split(rng)
     if config.algo == "vae":
         network_params = vae.init(init_rng, ac_init_in, init_act, reparam_rng)
-    elif config.algo == "vqvae":
+    elif config.algo == "vqvae" or config.algo == "vqvae_modify":
         network_params = vae.init(init_rng, ac_init_in, init_act)
     elif config.algo == "vqvae_gumble_softmax":
         network_params = vae.init(init_rng, ac_init_in, init_act, reparam_rng, 0)
@@ -316,7 +324,7 @@ def train(config):
                     kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
                     print(action.shape)
                     return recon_loss + config.vae_kl_weight * kl_loss.mean()
-                elif method == 'vqvae':
+                elif method == 'vqvae' or method == 'vqvae_modify':
                     pi, z, loss = vae.apply(params, (obs, done), action)
                     recon_loss = -pi.log_prob(action)
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
@@ -361,7 +369,7 @@ def train(config):
             std = jnp.exp(0.5 * log_var)
             eps = jax.random.normal(rng, mu.shape)
             return mu + eps * std
-        elif method == 'vqvae':
+        elif method == 'vqvae' or method == 'vqvae_modify':
             pi, z, loss = vae.apply(params, x, act)
             # (obs, done) = x
             # done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)

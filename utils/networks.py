@@ -195,7 +195,6 @@ class Encoder(nn.Module):
         mu = nn.Dense(self.latent_dim)(needed_embedding)
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
         return mu, log_var # (batch_size, latent_dim)
-    
 class Encoder_attention(nn.Module):
     latent_dim: int  # Latent space dimension
     hidden_dim: int  # Hidden state dimension
@@ -248,7 +247,6 @@ class Encoder_attention(nn.Module):
         mu = nn.Dense(self.latent_dim)(result)
         log_var = nn.Dense(self.latent_dim)(result)
         return mu, log_var
-
 class Decoder(nn.Module):
     action_dim: int  # action space dimension
 
@@ -354,8 +352,61 @@ class VQVAE(nn.Module):
         z_q = self.codebook[z_q]
         loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \
                jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta * self.alpha
-        return z, loss
         return z + jax.lax.stop_gradient(z_q - z), loss
+
+    def __call__(self, x, act):
+        mu, log_var = self.encoder(x, act)  # Encode
+        z, loss = self.reparameterize(mu)  # Reparameterization
+        print(mu.shape,z.shape)
+        pi = self.decoder(z, x)  # Decode
+        return pi, z, loss
+class VQVAE_modify(nn.Module):
+    latent_dim: int
+    Encoder_hidden_dim: int
+    action_dim: int
+    discrete_policy: bool
+    k: int
+    alpha: float
+    beta: float
+
+    attention: bool
+    encoder_attention_features_dim: int = 4
+
+    use_sigma: bool = False
+
+    def setup(self):
+        if self.attention:
+            self.encoder = Encoder_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_attention_features_dim)
+        else:
+            self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.discrete_policy:
+            self.decoder = Decoder(self.action_dim)
+        else:
+            self.decoder = ContinuousDecoder(self.action_dim)
+
+        # self.mu is the codebook
+        self.mu = self.param('mu', nn.initializers.normal(1), (self.k, self.latent_dim))
+        if self.use_sigma:
+            def init_param(key,shape):
+                k, d, _ = shape
+                return jnp.tile(jnp.eye(d)[None,:,:],(k,1,1))#+jax.random.normal(key,(k,d,d))*0.001
+            self.sigma = self.param('sigma', init_param, (self.k, self.latent_dim,self.latent_dim))
+        else:
+            self.sigma = jnp.tile(jnp.eye(self.latent_dim)[None,:,:],(self.k,1,1))
+        
+    def log_pdf(self, x, mu): # return (batch_size, k)
+        x=x[:,None,:]-mu[None,:,:]
+        x=x[:,:,:,None]# (batch_size, k, latent_dim, 1)
+        sigma=1/2*(self.sigma+self.sigma.transpose((0,2,1))) # make sure sigma is symmetric
+        return -0.5*(x.transpose((0,1,3,2))@sigma@x).reshape(x.shape[0],x.shape[1])\
+               -0.5*jnp.log(jnp.linalg.det(sigma)+1e-5)
+       
+    def reparameterize(self, z):
+        # pdf = self.log_pdf(z,self.mu)
+        # loss = -jnp.max(pdf, axis=0).mean()*self.loss_weight
+        loss = -jnp.max(self.log_pdf(z,jax.lax.stop_gradient(self.mu)), axis=0).mean() / (1+self.beta)
+        loss+= -jnp.max(self.log_pdf(z,jax.lax.stop_gradient(self.mu)), axis=0).mean() * self.beta / (1+self.beta)
+        return z, loss * self.alpha
 
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode
