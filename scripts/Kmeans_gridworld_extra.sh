@@ -13,9 +13,9 @@ env_name="MiniGrid-Reacher-extra-good"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-# seeds=(0 1 2 3 4 5 6 7 8 9)
+seeds=(1 2 3 4 5)
 # Kvalues=(5 6 7 8 10 12 15)
-seeds=(0)
+# seeds=(0)
 Kvalues=(5) # for debugging
 rule_based_dataset_files=(
     "datasets/rule_based/MiniGrid-Reacher-extra-good/batch_8000.pkl"

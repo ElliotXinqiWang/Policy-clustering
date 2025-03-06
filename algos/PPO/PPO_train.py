@@ -33,7 +33,7 @@ class TrainConfig:
     make_plots: bool = True
     # Experiment
     alg: str = "PPO"  # Algorithm name
-    env: str = "MiniGrid-Reacher-extra-good"  # Environment name
+    env: str = "MiniGrid-Reacher-extra-med"  # Environment name
     extra_reward: float = 10.0
     seed: int = 2  # Sets Gym, Jax and Numpy seeds
     max_updates: int = 20000 # Maximum number of updates
@@ -369,7 +369,7 @@ if __name__ == "__main__":
         config.disable_jit = True
     wandb.init(
         project=config.project,
-        entity="elliotxinqiwang",#!/bin/bash
+        entity="huhaoo",#!/bin/bash
         group=config.group,
         name=config.name,
         config=config,

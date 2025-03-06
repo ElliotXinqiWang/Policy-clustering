@@ -195,6 +195,60 @@ class Encoder(nn.Module):
         mu = nn.Dense(self.latent_dim)(needed_embedding)
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
         return mu, log_var # (batch_size, latent_dim)
+    
+class Encoder_attention(nn.Module):
+    latent_dim: int  # Latent space dimension
+    hidden_dim: int  # Hidden state dimension
+    attention_features_dim: int
+    # Q: (attention_features_dim, hidden_dim)
+    # K: (seq_len, batch_size, hidden_dim)
+    # V: (seq_len, batch_size, latent_dim)
+
+    def setup(self):
+        self.Q = self.param('Q', nn.initializers.uniform(1), (self.attention_features_dim, self.hidden_dim))
+
+    @nn.compact
+    def __call__(self, x, act):
+        obs, done = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size), act: (seq_len, batch_size) or (seq_len, batch_size, act_dim)
+        act=act.reshape(act.shape[0],act.shape[1],-1)
+        done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+
+        # Embedding layer
+        embedding_obs = obs
+        embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
+        # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        embedding_act = act
+        embedding_act = nn.relu(nn.Dense(32)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(128)(embedding_act))
+        embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
+        # embedding = embedding_obs
+        embedding = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding))
+
+        batch_size = embedding.shape[1]
+        hidden = ScannedRNN.initialize_carry(batch_size, self.hidden_dim)
+        rnn_in = (embedding, done)
+        hidden, embedding = ScannedRNN()(hidden, rnn_in)
+        embedding = nn.relu(embedding)
+
+        K = nn.Dense(self.hidden_dim)(embedding)
+        K = nn.relu(K)
+        V = nn.Dense(self.latent_dim)(embedding)
+
+        K = K.transpose((1, 0, 2))  # (batch_size, seq_len, hidden_dim)
+        V = V.transpose((1, 0, 2))  # (batch_size, seq_len, latent_dim)
+        # jax.debug.print("K {}, V {}", K.shape, V.shape)
+        A = self.Q @ K.transpose((0, 2, 1)) / jnp.sqrt(self.hidden_dim) # (batch_size, attention_features_dim, seq_len)
+        # jax.debug.print("A {}, d {}", A.shape, done_mask.shape)
+        A = A * done_mask.transpose((1,0))[:, None, :]
+        A = nn.softmax(A)
+        result = A @ V
+
+        result = result.reshape(batch_size, -1)
+
+        mu = nn.Dense(self.latent_dim)(result)
+        log_var = nn.Dense(self.latent_dim)(result)
+        return mu, log_var
+
 class Decoder(nn.Module):
     action_dim: int  # action space dimension
 
@@ -277,12 +331,17 @@ class VQVAE(nn.Module):
     Encoder_hidden_dim: int
     action_dim: int
     discrete_policy: bool
+    attention: bool
     k: int
     alpha: float = 1
     beta: float = 0.25
+    encoder_attention_features_dim: int = 4
 
     def setup(self):
-        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.attention:
+            self.encoder = Encoder_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_attention_features_dim)
+        else:
+            self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         if self.discrete_policy:
             self.decoder = Decoder(self.action_dim)
         else:
@@ -295,7 +354,7 @@ class VQVAE(nn.Module):
         z_q = self.codebook[z_q]
         loss = jnp.mean(jax.lax.stop_gradient(z_q) - z)**2 * self.alpha + \
                jnp.mean(z - jax.lax.stop_gradient(z_q))**2 * self.beta * self.alpha
-        # return z, loss
+        return z, loss
         return z + jax.lax.stop_gradient(z_q - z), loss
 
     def __call__(self, x, act):

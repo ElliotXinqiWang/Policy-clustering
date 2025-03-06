@@ -88,9 +88,12 @@ class TrainConfig:
     name: str = ""
     algo: str = "vae"
     vqvae_codebook: int = -1
-    vqvae_alpha: float = 1
+    vqvae_alpha: float = 1.0
     vqvae_beta: float = 0.25
-    vqvae_entropy_weight: float = 1
+    vqvae_entropy_weight: float = 1.0
+    encoder_attention: bool = False
+    encoder_hidden_dim: int = 32
+    encoder_attention_features_dim: int = 4
 
     take_ball_target: int = 0
 
@@ -201,6 +204,13 @@ def train(config):
         data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
     elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"] or config.load_from_rule_based_dataset:
         dataset, data_idx = load_rule_based_datasets(config)
+
+        # cnt=[0]*(int(jnp.max(data_idx)) + 1)
+        # for i in range(len(data_idx)):
+        #     idx=round(data_idx[i])
+        #     if cnt[idx]<5:
+        #         cnt[idx]+=1
+        #         env.visualize_obs(dataset.obs[i].reshape(-1,7,7,4),f"logs/{config.env}_{idx}_{cnt[idx]}.gif",dataset.reward[i],dataset.action[i])
     elif not os.path.exists("datasets/" + dataset_filename):
         dataset, data_idx = load_datasets(config)
     else:
@@ -208,21 +218,6 @@ def train(config):
             data = pickle.load(f)
             dataset = data["dataset"]
             data_idx = data["data_idx"]
-    # fdebug=open("logs/debug.txt","w")
-    # for i in range(len(dataset.obs)):
-    #     if data_idx[i]<0.5:
-    #         print(i,file=fdebug)
-    #         print(jnp.transpose(dataset.obs[i][:6].reshape(6,9,9,3),axes=(0,3,2,1))[:,1,:,:],file=fdebug)
-    #         print(dataset.action[i][:6],file=fdebug)
-    #         break
-    # print(file=fdebug)
-    # for i in range(len(dataset.obs)):
-    #     if data_idx[i]>0.5:
-    #         print(i,file=fdebug)
-    #         print(jnp.transpose(dataset.obs[i][:6].reshape(6,9,9,3),axes=(0,3,2,1))[:,1,:,:],file=fdebug)
-    #         print(dataset.action[i][:6],file=fdebug)
-    #         break
-    # exit(0)
     print("Dataset loaded, dataset size: ", dataset.obs.shape[0])
     # set the last done to be True if the episode is not done
     dataset = dataset._replace(done=jnp.concatenate([dataset.done[:, :-1], jnp.ones_like(dataset.done[:, -1:])], axis=1))
@@ -260,12 +255,12 @@ def train(config):
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
     if config.algo == "vae":
-        vae = VAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim, discrete_action=(config.env in DiscreteEnvNames))
+        vae = VAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, discrete_action=(config.env in DiscreteEnvNames))
     elif config.algo == "vqvae":
-        vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
-                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)
+        vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
+                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook, attention=config.encoder_attention, encoder_attention_features_dim=config.encoder_attention_features_dim)
     elif config.algo == "vqvae_gumble_softmax":
-        vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=32, action_dim=config.action_dim,
+        vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim,
                                    discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                                    k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)                    
     # Initialize model and optimizer
@@ -355,7 +350,7 @@ def train(config):
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
         wandb.log({"Loss": loss})
-        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
+        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4:
             break
     print("Training finished after ", i, " updates")
     
