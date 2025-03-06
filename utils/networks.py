@@ -416,6 +416,8 @@ class VQVAE_modify(nn.Module):
 
     use_sigma: bool = False
 
+    method: str = 'max'
+
     def setup(self):
         if self.attention:
             self.encoder = Encoder_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_attention_features_dim)
@@ -429,25 +431,40 @@ class VQVAE_modify(nn.Module):
         # self.mu is the codebook
         self.mu = self.param('mu', nn.initializers.normal(1), (self.k, self.latent_dim))
         if self.use_sigma:
-            def init_param(key,shape):
-                k, d, _ = shape
-                return jnp.tile(jnp.eye(d)[None,:,:],(k,1,1))#+jax.random.normal(key,(k,d,d))*0.001
-            self.sigma = self.param('sigma', init_param, (self.k, self.latent_dim,self.latent_dim))
+            self.sigma = self.param('sigma', lambda r: jnp.array(1.))
         else:
-            self.sigma = jnp.tile(jnp.eye(self.latent_dim)[None,:,:],(self.k,1,1))
+            self.sigma = jnp.array(1.)
+        if self.method == 'max':
+            self.method_id=0
+        elif self.method == 'sum':
+            self.method_id=1
+        else:
+            raise ValueError(f"method {self.method} not supported")
+        # if self.use_sigma:
+        #     def init_param(key,shape):
+        #         k, d, _ = shape
+        #         return jnp.tile(jnp.eye(d)[None,:,:],(k,1,1))#+jax.random.normal(key,(k,d,d))*0.001
+        #     self.sigma = self.param('sigma', init_param, (self.k, self.latent_dim,self.latent_dim))
+        # else:
+        #     self.sigma = jnp.tile(jnp.eye(self.latent_dim)[None,:,:],(self.k,1,1))
         
     def log_pdf(self, x, mu): # return (batch_size, k)
         x=x[:,None,:]-mu[None,:,:]
+        return -0.5*jnp.sum(x**2,axis=-1)*jnp.abs(self.sigma) - 0.5*jnp.log(jnp.abs(self.sigma)+1e-5)
         x=x[:,:,:,None]# (batch_size, k, latent_dim, 1)
         sigma=1/2*(self.sigma+self.sigma.transpose((0,2,1))) # make sure sigma is symmetric
         return -0.5*(x.transpose((0,1,3,2))@sigma@x).reshape(x.shape[0],x.shape[1])\
                -0.5*jnp.log(jnp.linalg.det(sigma)+1e-5)
-       
+    
+    def sum(self, x):
+        x=nn.relu(x)
+        return jax.lax.cond(self.method_id==0,lambda _: jnp.max(x,axis=0),lambda _: (x*nn.softmax(x,axis=0)).sum(axis=0),None)
+
     def reparameterize(self, z):
         # pdf = self.log_pdf(z,self.mu)
         # loss = -jnp.max(pdf, axis=0).mean()*self.loss_weight
-        loss = -jnp.max(self.log_pdf(z,jax.lax.stop_gradient(self.mu)), axis=0).mean() / (1+self.beta)
-        loss+= -jnp.max(self.log_pdf(z,jax.lax.stop_gradient(self.mu)), axis=0).mean() * self.beta / (1+self.beta)
+        loss = -self.sum(self.log_pdf(z,jax.lax.stop_gradient(self.mu))).mean() / (1+self.beta)
+        loss+= -self.sum(self.log_pdf(jax.lax.stop_gradient(z),self.mu)).mean() * self.beta / (1+self.beta)
         return z, loss * self.alpha
 
     def __call__(self, x, act):

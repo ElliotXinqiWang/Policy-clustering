@@ -95,6 +95,7 @@ class TrainConfig:
     encoder_hidden_dim: int = 32
     encoder_attention_features_dim: int = 4
     vqvae_modify_use_sigma: bool = False
+    vqvae_modify_sum_method: str = "sum"
 
     take_ball_target: int = 0
 
@@ -268,7 +269,7 @@ def train(config):
         vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                            discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
                            attention=config.encoder_attention, encoder_attention_features_dim=config.encoder_attention_features_dim,
-                           use_sigma=config.vqvae_modify_use_sigma)
+                           use_sigma=config.vqvae_modify_use_sigma, method=config.vqvae_modify_sum_method)
     else:
         raise ValueError("Unknown algo: ", config.algo)
     # Initialize model and optimizer

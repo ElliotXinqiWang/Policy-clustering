@@ -7,3 +7,4 @@ behavior_models/
 *.pyc
 __pycache__/
 logs/
+nohup.out
