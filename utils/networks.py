@@ -148,6 +148,48 @@ class ActorCriticRNN(nn.Module):
         )
         
         return hidden, pi, jnp.squeeze(critic, axis=-1)
+    
+    
+class ContinuousActorCriticRNN(nn.Module):
+    action_dim: int
+    config: Dict 
+    
+    @nn.compact
+    def __call__(self, hidden, x):
+        obs, dones = x
+        embedding = nn.Dense(
+            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(obs)
+        embedding = nn.relu(embedding)
+        
+        rnn_in = (embedding, dones)
+        hidden, rnn_out = ScannedRNN()(hidden, rnn_in)
+        
+        embedding = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            rnn_out
+        )
+        embedding = nn.relu(embedding)
+        actor_mean = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(embedding)
+        actor_std = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(embedding)
+        actor_std = jax.nn.softplus(actor_std) + 1e-5
+        
+        pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
+        
+        
+        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
+            rnn_out
+        )
+        critic = nn.relu(critic)
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
+        
+        return hidden, pi, jnp.squeeze(critic, axis=-1)
+    
 class Encoder(nn.Module):
     latent_dim: int  # Latent space dimension
     hidden_dim: int  # Hidden state dimension
