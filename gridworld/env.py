@@ -47,6 +47,8 @@ class SingleAgentGridworld:
         """
         self.name = "SingleAgentGridworld"
         self.grid_size = grid_size
+        self.action_dim = 5
+        self.action_type = "discrete"
         self.max_steps = max_steps
         self.distance_penalty = distance_penalty
         self.goal_reward = goal_reward

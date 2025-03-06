@@ -31,6 +31,7 @@ class SingleAgentEnv:
         self.barrier_size = barrier_size
         self.contact_force = contact_force
         self.noise_constant = noise_constant
+        self.action_type = "continuous"
 
         # Force-control: action is 2D continuous for acceleration
         # self.action_space = Box(low=-1.0, high=1.0, shape=(2,))
@@ -46,7 +47,7 @@ class SingleAgentEnv:
         self.collision_penalty = -5.0  # collision penalty for each barrier we hit
         self.distance_coef = 1.0       # coefficient for distance to the goal
 
-    def reset(self) -> SingleState:
+    def reset(self, key: chex.PRNGKey) -> SingleState:
         """Reset environment to default initial state."""
         # Default agent at origin, velocity=0
         p_pos = jnp.array([-1.0, -1.0])
@@ -58,9 +59,11 @@ class SingleAgentEnv:
         done = False
         step = 0
         goal = jnp.array([1.0, 1.0])
-        return SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
+        state = SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
+        obs = self.get_obs(state)
+        return obs, state
 
-    def get_observation(self, state: SingleState) -> jnp.ndarray:
+    def get_obs(self, state: SingleState) -> jnp.ndarray:
         """Combine agent pos, vel, goal pos, and barrier positions into a single vector."""
         # Flatten barrier positions
         barrier_flat = state.barriers.reshape(-1)
@@ -77,9 +80,7 @@ class SingleAgentEnv:
         collision_cost = self.collision_penalty * collisions.sum()
         
         # add out of bounds penalty. When out of the circle of radius 2, add a quadratic penalty
-        
-        dist_to_origin = jnp.linalg.norm(state.p_pos)
-        penalty = jnp.maximum(0.0, dist_to_origin - 2.0) ** 2
+        penalty = jnp.maximum(0.0, jnp.linalg.norm(state.p_pos) - 2.0) ** 2
         
         return distance_reward + collision_cost - penalty
 
@@ -90,12 +91,12 @@ class SingleAgentEnv:
         friction = 0.99
 
         # Vectorized collision check with barriers using vmap
-        collision_results = jax.vmap(lambda b: self.check_collision(new_pos, b))(state.barriers)
-        collision_forces = jax.vmap(lambda b: (new_pos - b))(state.barriers) * self.contact_force * collision_results[:, None]
+        collision_results = jax.vmap(lambda b: self.check_collision(state.p_pos, b))(state.barriers)
+        collision_forces = jax.vmap(lambda b: (state.p_pos - b))(state.barriers) * self.contact_force * collision_results[:, None]
         collision_forces = collision_forces.sum(axis=0)
         
         action_forces = action * force_scale
-        
+        key, noise_key = jax.random.split(key)
         noise_force = jax.random.normal(key, shape=(2,)) * self.noise_constant
         
         # Update velocity by applying action (force) then friction
@@ -122,14 +123,15 @@ class SingleAgentEnv:
 
         # Compute reward
         reward_val = self.get_reward(new_state, collision_results)
-
+        key, reset_key = jax.random.split(key)
+        re_obs, re_state = self.reset(reset_key)
         new_state = jax.lax.cond(
             done, 
-            lambda x: self.reset(), 
+            lambda x: re_state, 
             lambda x: new_state, 
             operand=None)
         
-        obs = self.get_observation(new_state)
+        obs = self.get_obs(new_state)
 
         return obs, new_state, reward_val, done
 
@@ -148,6 +150,45 @@ class SingleAgentEnv:
         plt.legend()
         plt.show()
 
+    def visualize_states(self, states: list, filename: str = "gridworld.gif", rewards=None, actions=None, interval=500):
+        """Creates a GIF from a list of states."""
+        grid_size = self.grid_size
+        fig, ax = plt.subplots(figsize=(5, 5))
+        s = states
+        def update(frame):
+            ax.clear()
+            ax.set_xlim(-2, 4)
+            ax.set_ylim(-2, 4)
+            # Agent
+            ax.scatter(s.p_pos[frame][0], s.p_pos[frame][1], label="Agent")
+            # Goal
+            ax.scatter(s.goal[frame][0], s.goal[frame][1], marker="x", label="Goal")
+            # Barriers
+            for i in range(self.n_barriers):
+                ax.scatter(s.barriers[frame][i, 0], s.barriers[frame][i, 1], marker="s", label=f"Barrier {i}")
+            ax.legend()
+            # Add rewards and actions if provided
+            if rewards is not None:
+                ax.text(
+                    grid_size - 1.5, -0.8,
+                    f"Reward: {rewards[frame]:.2f}" if frame < len(rewards) else "Reward: N/A",
+                    ha="right", va="center", fontsize=10, color="blue", weight="bold"
+                )
+
+            if actions is not None:
+                ax.text(
+                    grid_size - 1.5, -1.2,
+                    f"Action: {actions[frame]}" if frame < len(actions) else "Action: N/A",
+                    ha="right", va="center", fontsize=10, color="green", weight="bold"
+                )
+            
+         # Create animation
+        ani = animation.FuncAnimation(fig, update, frames=len(states), interval=interval)
+        ani.save(filename, writer="imagemagick")
+        plt.close(fig)
+        print("Saved GIF to", filename)
+    
+    
     def render_from_state_list(self, state_list, filename="rollout.gif"):
         """Render all states in state_list as frames, then save as a GIF."""
         import imageio

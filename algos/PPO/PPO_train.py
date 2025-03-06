@@ -12,9 +12,10 @@ from flax.training.train_state import TrainState
 from flax import serialization
 import wandb
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld
+from gridworld.continuous_gridworld import SingleAgentEnv, TwoBarriorEnv
 
 
-from utils.networks import ActorCriticRNN, ScannedRNN
+from utils.networks import ActorCriticRNN, ScannedRNN, ContinuousActorCriticRNN
 
 class Transitions(NamedTuple):
     obs: jnp.ndarray = field(default_factory=lambda: jnp.empty((0,)))
@@ -33,10 +34,10 @@ class TrainConfig:
     make_plots: bool = True
     # Experiment
     alg: str = "PPO"  # Algorithm name
-    env: str = "MiniGrid-Reacher-extra-med"  # Environment name
+    env: str = "ContGrid-Diaganol"  # Environment name
     extra_reward: float = 10.0
     seed: int = 2  # Sets Gym, Jax and Numpy seeds
-    max_updates: int = 20000 # Maximum number of updates
+    max_updates: int = 200 # Maximum number of updates
     n_episodes: int = 5  # How many episodes run during evaluation
     checkpoints_path: Optional[str] = None  # Save path
     # batch_size: int = 32  # Batch size for all networks
@@ -44,6 +45,7 @@ class TrainConfig:
     save_model: bool = True  # Save the model
     save_thresholds: list[float] = field(default_factory=lambda: [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, float("inf")])
     epsilon: float = 0.1
+    noise_constant: float = 0.01
     # Network & training
     hidden_dim: int = 128
     max_grad_norm: float = 0.5
@@ -124,17 +126,23 @@ def get_rollout(config):
         env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
     elif config.env == "MiniGrid-Reacher-extra-med":
         env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
+    elif config.env == "ContGrid-Diaganol":
+        env = SingleAgentEnv(n_barriers=1, max_steps=100, agent_size=0.1, barrier_size=0.1, contact_force=0.1, noise_constant=config.noise_constant)
     else:
         raise ValueError("Environment: ", config.env, " not supported")    
 
-    config.action_dim = 5
+    # config.action_dim = 5
+    config.action_dim = env.action_dim
     obs_shape = env.observation_shape
     config.observation_dim = obs_shape.prod()
     
     def rollout_fn(rng):
         # Initialize networks
         rng, init_rng = jax.random.split(rng)
-        actor_critic = ActorCriticRNN(action_dim=config.action_dim, config=config)
+        if env.action_type == "discrete":
+            actor_critic = ActorCriticRNN(action_dim=config.action_dim, config=config)
+        else:
+            actor_critic = ContinuousActorCriticRNN(action_dim=config.action_dim, config=config)
         init_x = jnp.zeros((2, 1, config.observation_dim))
         ac_init_in = (init_x, jnp.zeros((2, 1)))
         init_hidden = ScannedRNN.initialize_carry(2, 128)
@@ -395,7 +403,6 @@ if __name__ == "__main__":
     
     # render a few episodes
     with jax.disable_jit(config.disable_jit):
-        network = ActorCriticRNN(action_dim=config.action_dim, config=config)
         if config.env == "MiniGrid-Reacher":
             env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=config.epsilon)
         elif config.env == "MiniGrid-Binary-Reacher":
@@ -408,8 +415,14 @@ if __name__ == "__main__":
             env = ExtraRewardGridworld(grid_size=7, max_steps=20, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
         elif config.env == "MiniGrid-Reacher-extra-med":
             env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
+        elif config.env == "ContGrid-Diaganol":
+            env = SingleAgentEnv(n_barriers=1, max_steps=100, agent_size=0.1, barrier_size=0.1, contact_force=0.1, noise_constant=config.noise_constant)
         else:
             raise ValueError("Environment: ", config.env, " not supported")
+        if env.action_type == "discrete":
+            network = ActorCriticRNN(action_dim=config.action_dim, config=config)
+        else:
+            network = ContinuousActorCriticRNN(action_dim=config.action_dim, config=config)
         rng = jax.random.PRNGKey(config.seed)
         obs, state = env.reset(key=rng)
         obs = obs.reshape((1, -1))
