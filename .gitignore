@@ -8,3 +8,4 @@ behavior_models/
 __pycache__/
 logs/
 nohup.out
+.nfs*

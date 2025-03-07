@@ -91,9 +91,13 @@ class TrainConfig:
     vqvae_alpha: float = 1.0
     vqvae_beta: float = 0.25
     vqvae_entropy_weight: float = 1.0
+
     encoder_attention: bool = False
     encoder_hidden_dim: int = 32
-    encoder_attention_features_dim: int = 4
+    encoder_heads: int = 4
+    encoder_attention_pre_process: str = "rnn"
+    encoder_attention_pre_process_layers: int = 1
+
     vqvae_modify_use_sigma: bool = False
     vqvae_modify_sum_method: str = "sum"
 
@@ -260,7 +264,7 @@ def train(config):
         vae = VAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, discrete_action=(config.env in DiscreteEnvNames))
     elif config.algo == "vqvae":
         vae = VQVAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
-                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook, attention=config.encoder_attention, encoder_attention_features_dim=config.encoder_attention_features_dim)
+                    discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook, attention=config.encoder_attention, encoder_heads=config.encoder_heads)
     elif config.algo == "vqvae_gumble_softmax":
         vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim,
                                    discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
@@ -268,7 +272,7 @@ def train(config):
     elif config.algo == "vqvae_modify":
         vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                            discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
-                           attention=config.encoder_attention, encoder_attention_features_dim=config.encoder_attention_features_dim,
+                           attention=config.encoder_attention, encoder_heads=config.encoder_heads,
                            use_sigma=config.vqvae_modify_use_sigma, method=config.vqvae_modify_sum_method)
     else:
         raise ValueError("Unknown algo: ", config.algo)
