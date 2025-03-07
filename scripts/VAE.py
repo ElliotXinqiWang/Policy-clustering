@@ -5,19 +5,24 @@ import math
 
 os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
-
 random.seed()
-runtimes=16
-runtimes=1
-vqvae_alpha=10
+
+origin_path="algos/VAE_kmeans.py"
+copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
+
+os.system(f"cp {origin_path} {copy_path}")
+
+runtimes=8
+# runtimes=1
+vqvae_alpha=100
 vqvae_beta=0.7
 codebook=16
-max_updates=400
+max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
-learning_rate=2e-4
-encoder_hidden_dim=8
-encoder_heads=2
+learning_rate=5e-4
+encoder_hidden_dim=1
+encoder_heads=1
 algo="vqvae_modify"
 project="vae_v1.2"
 batch_size=512
@@ -67,8 +72,8 @@ def rand_hypers():
     # algo=random.choice(["vqvae","vqvae_modify","vqvae_modify","vqvae_modify"])
     seed = random.randint(0,2**30-1)
     # codebook = 2**random.randint(3,6)
-    # vqvae_beta = log_uniform(0.1,10)
-    # vqvae_alpha = log_uniform(1e-1,1e4)
+    vqvae_beta = log_uniform(0.5,2)
+    vqvae_alpha = log_uniform(1e-1,1e3)
     # encoder_attention = random.choice([True,False])
     if encoder_attention:
         # encoder_hidden_dim = random.choice([1,1,1,8,32])
@@ -84,7 +89,7 @@ def rand_hypers():
 
 for _ in range(runtimes):
     rand_hypers()
-    command= f"CUDA_VISIBLE_DEVICES={gpuid} python algos/VAE_kmeans.py "
+    command= f"CUDA_VISIBLE_DEVICES={gpuid} python {copy_path} "
     command+=f"--env {env_name} "
     command+=f"--seed {seed} "
     command+=f"--project {project} "
@@ -110,3 +115,6 @@ for _ in range(runtimes):
     command+=f"--encoder_attention_pre_process_layers {encoder_attention_pre_process_layers} "
     print(command)
     os.system(command)
+
+os.system(f"rm {copy_path}")
+print("All done!")
