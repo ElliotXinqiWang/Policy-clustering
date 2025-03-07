@@ -237,7 +237,7 @@ class Encoder(nn.Module):
         mu = nn.Dense(self.latent_dim)(needed_embedding)
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
         return mu, log_var # (batch_size, latent_dim)
-class Encoder_attention(nn.Module):
+class Encoder_rnn_attention(nn.Module):
     latent_dim: int  # Latent space dimension
     hidden_dim: int  # Hidden state dimension
     heads: int
@@ -378,10 +378,16 @@ class VQVAE(nn.Module):
     alpha: float = 1
     beta: float = 0.25
     encoder_heads: int = 4
+    pre_process: str = 'rnn'
+    pre_process_layers: int = 1
 
     def setup(self):
         if self.attention:
-            self.encoder = Encoder_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+            if self.pre_process == 'none':
+                self.pre_process = "multihead"
+                self.pre_process_layers = 0
+            if self.pre_process == 'rnn':
+                self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
         else:
             self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         if self.discrete_policy:
@@ -415,16 +421,20 @@ class VQVAE_modify(nn.Module):
 
     attention: bool
     encoder_heads: int = 4
+    pre_process: str = 'rnn'
+    pre_process_layers: int = 1
 
     use_sigma: bool = False
 
     method: str = 'max'
-    pre_process: str = 'rnn'
-    pre_process_layers: int = 1
 
     def setup(self):
         if self.attention:
-            self.encoder = Encoder_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+            if self.pre_process == 'none':
+                self.pre_process = "multihead"
+                self.pre_process_layers = 0
+            if self.pre_process == 'rnn':
+                self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
         else:
             self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         if self.discrete_policy:
