@@ -13,25 +13,31 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 runtimes=256
-# runtimes=1
+# runtimes=4
 
 vqvae_alpha=1
 vqvae_beta=1
-codebook=16
+codebook=-1
 max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
-learning_rate=1e-3
-encoder_hidden_dim=32
+learning_rate=2e-3
+encoder_hidden_dim=8
 qk_dim=1
-encoder_heads=1
+encoder_heads=2
 algo="vqvae_modify"
-project="vae_v1.23"
+project="vae_v1.24"
 batch_size=512
 vqvae_modify_use_sigma=True
 vqvae_modify_sum_method="sum"
 encoder_attention_pre_process="rnn"
 encoder_attention_pre_process_layers=1
+
+lr_decay="none"
+# lr_decay="warmup-cos"
+lr_decay_v1=40
+lr_decay_v2=360
+lr_decay_v3=0.1
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
@@ -83,7 +89,7 @@ def rand_hypers():
         # encoder_hidden_dim, encoder_heads = random.choice([(1,1),(16,4)])
         # if encoder_heads > encoder_hidden_dim:
         #     encoder_heads = 1
-        encoder_attention_pre_process_layers=random.randint(0,3)
+        # encoder_attention_pre_process_layers=random.randint(0,3)
         pass
     if algo=="vqvae_modify":
         # vqvae_modify_use_sigma = random.choice([True,False])
@@ -117,7 +123,9 @@ for _ in range(runtimes):
         command+=f"--vqvae_modify_sum_method {vqvae_modify_sum_method} "
     command+=f"--batch_size {batch_size} "
     command+=f"--encoder_attention_pre_process {encoder_attention_pre_process} "
-    command+=f"--encoder_attention_pre_process_layers {encoder_attention_pre_process_layers} "
+    if encoder_attention_pre_process=="self_attention":
+        command+=f"--encoder_attention_pre_process_layers {encoder_attention_pre_process_layers} "
+    command+=f"--lr_decay {lr_decay} --lr_decay_v1 {lr_decay_v1} --lr_decay_v2 {lr_decay_v2} --lr_decay_v3 {lr_decay_v3} "
     print(command)
     os.system(command)
 

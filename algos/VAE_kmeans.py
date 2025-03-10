@@ -74,6 +74,18 @@ class TrainConfig:
     hidden_dim: int = 64
     max_grad_norm: float = 0.5
     learning_rate: float = 1e-3
+    
+    """
+    For lr_decay = warmup-cos:
+        lr_decay_v1 is the number of warmup steps
+        lr_decay_v2 is the number of decay steps
+        lr_decay_v3 is the end value ratio of the learning rate
+    """
+    lr_decay: str = "none"
+    lr_decay_v1: float = 1.0
+    lr_decay_v2: float = 1.0
+    lr_decay_v3: float = 1.0
+
     adam_eps: float = 1e-8
     # Kmeans
     k_value: int = 5 # Number of clusters
@@ -290,10 +302,20 @@ def train(config):
     elif config.algo == "vqvae_gumble_softmax":
         network_params = vae.init(init_rng, ac_init_in, init_act, reparam_rng, 0)
     
+    lr=config.learning_rate
+    if config.lr_decay == "warmup-cos":
+        lr=optax.warmup_cosine_decay_schedule(
+            init_value=0.0,
+            peak_value=config.learning_rate,
+            warmup_steps=round(config.lr_decay_v1),
+            decay_steps=round(config.lr_decay_v2 if config.lr_decay_v2 >=0 else config.max_updates-config.lr_decay_v1), 
+            end_value=config.lr_decay_v3 * config.learning_rate
+        )
+
     # Initialize optimizer
     tx = optax.chain(
         optax.clip_by_global_norm(config.max_grad_norm),
-        optax.adam(learning_rate=config.learning_rate, eps=config.adam_eps),
+        optax.adam(learning_rate=lr, eps=config.adam_eps),
     )
     train_state = TrainState.create(
         apply_fn=vae.apply,
@@ -364,7 +386,7 @@ def train(config):
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
         wandb.log({"Loss": loss})
-        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4:
+        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
             break
     print("Training finished after ", i, " updates")
     
