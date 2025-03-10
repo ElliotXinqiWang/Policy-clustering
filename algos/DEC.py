@@ -82,6 +82,12 @@ class TrainConfig:
     group: str = "PKmeans"
     name: str = ""
 
+    extra_reward: float = 0.5
+
+    attention: bool = False
+    encoder_heads: int = 4
+    qk_dim: int = 1
+
     def __post_init__(self):
         # self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
         self.name = f"{self.name}-{self.env}-{self.K_value}"
@@ -187,7 +193,7 @@ def train(config):
         print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
         print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
         data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"]:
+    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP", "MiniGrid-Reacher-extra-good"]:
         dataset, data_idx = load_rule_based_datasets(config)
     elif not os.path.exists("datasets/" + dataset_filename):
         dataset, data_idx = load_datasets(config)
@@ -230,7 +236,7 @@ def train(config):
 
     # Initialize model and optimizer
     True_k_value = int(jnp.max(data_idx)) + 1
-    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=(config.env not in D4RL_envs))
+    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=(config.env not in D4RL_envs), attention=config.attention, encoder_heads=config.encoder_heads)
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     act_init = jnp.zeros((2, 1, 1)) if not(config.env in D4RL_envs) else jnp.zeros((2, 1, env.action_space.shape[0]))

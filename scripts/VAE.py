@@ -12,22 +12,24 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 
 os.system(f"cp {origin_path} {copy_path}")
 
-runtimes=8
+runtimes=256
 # runtimes=1
-vqvae_alpha=100
-vqvae_beta=0.7
+
+vqvae_alpha=1
+vqvae_beta=1
 codebook=16
 max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
-learning_rate=5e-4
-encoder_hidden_dim=1
+learning_rate=1e-3
+encoder_hidden_dim=32
+qk_dim=1
 encoder_heads=1
 algo="vqvae_modify"
-project="vae_v1.2"
+project="vae_v1.23"
 batch_size=512
-vqvae_modify_use_sigma=False
-vqvae_modify_sum_method="max"
+vqvae_modify_use_sigma=True
+vqvae_modify_sum_method="sum"
 encoder_attention_pre_process="rnn"
 encoder_attention_pre_process_layers=1
 
@@ -68,24 +70,27 @@ def log_uniform(mi,mx):
     return mi*math.exp(random.random()*math.log(mx/mi))
 def rand_hypers():
     global seed,codebook,vqvae_beta,vqvae_alpha,encoder_attention,encoder_hidden_dim, algo
-    global encoder_heads,learning_rate,vqvae_modify_use_sigma, vqvae_modify_sum_method, encoder_attention_pre_process, encoder_attention_pre_process_multihead_layers
+    global encoder_heads,learning_rate,vqvae_modify_use_sigma, vqvae_modify_sum_method, encoder_attention_pre_process, encoder_attention_pre_process_layers
     # algo=random.choice(["vqvae","vqvae_modify","vqvae_modify","vqvae_modify"])
     seed = random.randint(0,2**30-1)
     # codebook = 2**random.randint(3,6)
-    vqvae_beta = log_uniform(0.5,2)
-    vqvae_alpha = log_uniform(1e-1,1e3)
+    # vqvae_beta = log_uniform(0.5,2)
+    # vqvae_alpha = log_uniform(1e-1,1e3)
     # encoder_attention = random.choice([True,False])
     if encoder_attention:
         # encoder_hidden_dim = random.choice([1,1,1,8,32])
         # encoder_heads = random.choice([1,1,1,4,16])
-        if encoder_heads > encoder_hidden_dim:
-            encoder_heads = 1
+        # encoder_hidden_dim, encoder_heads = random.choice([(1,1),(16,4)])
+        # if encoder_heads > encoder_hidden_dim:
+        #     encoder_heads = 1
+        encoder_attention_pre_process_layers=random.randint(0,3)
         pass
     if algo=="vqvae_modify":
         # vqvae_modify_use_sigma = random.choice([True,False])
         # vqvae_modify_sum_method = random.choice(["max","sum"])
         pass
-    # learning_rate = log_uniform(1e-5,1e-2)
+    # learning_rate = log_uniform(1e-4,1e-2)
+    # learning_rate = random.choice([5e-3,5e-4,5e-5])
 
 for _ in range(runtimes):
     rand_hypers()

@@ -238,16 +238,17 @@ class Encoder(nn.Module):
         log_var = nn.Dense(self.latent_dim)(needed_embedding)
         return mu, log_var # (batch_size, latent_dim)
 class Encoder_rnn_attention(nn.Module):
-    latent_dim: int  # Latent space dimension
+    latent_dim: int  # Hidden state dimension
     hidden_dim: int  # Hidden state dimension
     heads: int
-    # Q: (heads, hidden_dim)
-    # K: (seq_len, batch_size, heads, hidden_dim)
+    qk_dim: int = 1 # Latent space dimension
+    # Q: (heads, qk_dim)
+    # K: (seq_len, batch_size, heads, qk_dim)
     # V: (seq_len, batch_size, heads, latent_dim)
 
 
     def setup(self):
-        self.Q = self.param('Q', nn.initializers.uniform(1), (self.heads, self.hidden_dim))
+        self.Q = self.param('Q', nn.initializers.uniform(1), (self.heads, self.qk_dim))
 
     @nn.compact
     def __call__(self, x, act):
@@ -273,6 +274,77 @@ class Encoder_rnn_attention(nn.Module):
         hidden, embedding = ScannedRNN()(hidden, rnn_in)
         embedding = nn.relu(embedding)
 
+        K = nn.Dense(self.heads*self.qk_dim)(embedding).reshape(seq_len, batch_size, self.heads, self.qk_dim)
+        K = nn.relu(K)
+        V = nn.Dense(self.heads*self.latent_dim)(embedding).reshape(seq_len, batch_size, self.heads, self.latent_dim)
+
+        K = K.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, qk_dim)
+        V = V.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, latent_dim)
+        print("shape", K.shape, self.Q.shape)
+        A = (self.Q[None,:,None,:] * K).sum(axis=-1) / jnp.sqrt(self.qk_dim) # (batch_size, heads, seq_len)
+        # jax.debug.print("A {}, d {}", A.shape, done_mask.shape)
+        A = A * done_mask.transpose((1,0))[:, None, :]
+        A = nn.softmax(A)
+        result = (A[:,:,:,None] * V).sum(axis=2)  # (batch_size, heads, latent_dim)
+
+        result = result.reshape(batch_size, -1)
+
+        mu = nn.Dense(self.latent_dim)(result)
+        log_var = nn.Dense(self.latent_dim)(result)
+        return mu, log_var
+class Encoder_self_attention(nn.Module):
+    latent_dim: int  # Latent space dimension
+    hidden_dim: int  # Hidden state dimension
+    heads: int
+    layers: int
+
+    def setup(self):
+        self.Q = self.param('Q', nn.initializers.uniform(1), (self.heads, self.hidden_dim))
+
+    def self_attention(self, x, mask):
+        # x: (seq_len, batch_size, latent_dim)
+        # mask: (seq_len, batch_size )
+        Q = nn.relu(nn.Dense(self.heads*self.hidden_dim)(x).reshape(x.shape[0], x.shape[1], self.heads, self.hidden_dim))
+        K = nn.relu(nn.Dense(self.heads*self.hidden_dim)(x).reshape(x.shape[0], x.shape[1], self.heads, self.hidden_dim))
+        V = nn.relu(nn.Dense(self.heads*self.latent_dim)(x).reshape(x.shape[0], x.shape[1], self.heads, self.latent_dim))
+        Q = Q.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, hidden_dim)
+        K = K.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, hidden_dim)
+        V = V.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, latent_dim)
+        A = Q@K.transpose((0,1,3,2))/jnp.sqrt(self.hidden_dim) # (batch_size, heads, seq_len, seq_len)
+        A = A * mask.transpose((1,0))[:, None, :, None]
+        A = nn.softmax(A, axis=-1) # (batch_size, heads, seq_len, latent_dim)
+        result = (A@V).transpose((2,0,1,3)).reshape(x.shape[0], x.shape[1], -1) # (seq_len, batch_size, heads*latent_dim)
+        return nn.relu(nn.Dense(self.latent_dim)(result))
+
+    @nn.compact
+    def __call__(self, x, act):
+        obs, done = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size), act: (seq_len, batch_size) or (seq_len, batch_size, act_dim)
+        act=act.reshape(act.shape[0],act.shape[1],-1)
+        done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+        seq_len = obs.shape[0]
+        batch_size = obs.shape[1]
+
+        # Embedding layer
+        embedding_obs = obs
+        embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
+        # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        embedding_act = act
+        embedding_act = nn.relu(nn.Dense(32)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(128)(embedding_act))
+        embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
+        # embedding = embedding_obs
+        embedding = nn.relu(nn.Dense(self.latent_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding))
+
+        attention = self.self_attention(embedding, done_mask)
+        embedding = jax.lax.cond(self.layers>0, lambda _: attention, lambda _: embedding, None)
+        attention = self.self_attention(embedding, done_mask)
+        embedding = jax.lax.cond(self.layers>1, lambda _: attention, lambda _: embedding, None)
+        attention = self.self_attention(embedding, done_mask)
+        embedding = jax.lax.cond(self.layers>2, lambda _: attention, lambda _: embedding, None)
+
+        # Q: (heads, hidden_dim)
+        # K: (seq_len, batch_size, heads, hidden_dim)
+        # V: (seq_len, batch_size, heads, latent_dim)
         K = nn.Dense(self.heads*self.hidden_dim)(embedding).reshape(seq_len, batch_size, self.heads, self.hidden_dim)
         K = nn.relu(K)
         V = nn.Dense(self.heads*self.latent_dim)(embedding).reshape(seq_len, batch_size, self.heads, self.latent_dim)
@@ -352,9 +424,15 @@ class VAE(nn.Module):
     Encoder_hidden_dim: int
     action_dim: int
     discrete_action: bool
+    
+    attention: bool
+    encoder_heads: int = 4
 
     def setup(self):
-        self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.attention:
+            self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+        else:
+            self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         self.decoder = Decoder(self.action_dim) if self.discrete_action else ContinuousDecoder(self.action_dim)
 
     def reparameterize(self, mu, log_var, rng):
@@ -380,14 +458,19 @@ class VQVAE(nn.Module):
     encoder_heads: int = 4
     pre_process: str = 'rnn'
     pre_process_layers: int = 1
+    qk_dim: int = 1
 
     def setup(self):
         if self.attention:
             if self.pre_process == 'none':
-                self.pre_process = "multihead"
+                self.pre_process = "self_attention"
                 self.pre_process_layers = 0
             if self.pre_process == 'rnn':
-                self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+                self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads, qk_dim=self.qk_dim)
+            elif self.pre_process == 'self_attention':
+                self.encoder = Encoder_self_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads, self.pre_process_layers)
+            else:
+                raise ValueError(f"pre_process {self.pre_process} not supported")
         else:
             self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         if self.discrete_policy:
@@ -431,10 +514,14 @@ class VQVAE_modify(nn.Module):
     def setup(self):
         if self.attention:
             if self.pre_process == 'none':
-                self.pre_process = "multihead"
+                self.pre_process = "self_attention"
                 self.pre_process_layers = 0
             if self.pre_process == 'rnn':
                 self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+            elif self.pre_process == 'self_attention':
+                self.encoder = Encoder_self_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads, self.pre_process_layers)
+            else:
+                raise ValueError(f"pre_process {self.pre_process} not supported")
         else:
             self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         if self.discrete_policy:
@@ -556,9 +643,16 @@ class DEC(nn.Module):
     n_clusters: int
     action_dim: int
     discrete_action: bool
+    Encoder_hidden_dim: int = 32
+    
+    attention: bool = False
+    encoder_heads: int = 4
 
     def setup(self):
-        self.encoder = Encoder(self.latent_dim, 32)
+        if self.attention:
+            self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+        else:
+            self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)
         self.decoder = Decoder(self.action_dim) if self.discrete_action else ContinuousDecoder(self.action_dim)
 

@@ -1,10 +1,11 @@
 #in/bash"
-env_name="halfcheetah-medium-expert-v2"
+# env_name="halfcheetah-medium-expert-v2"
 # env_name="hopper-medium-expert-v2"
 # env_name="ant-medium-expert-v2"
 # env_name="walker2d-medium-expert-v2"
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
+env_name="MiniGrid-Reacher-extra-good"
 
 # dataset="expert"
 # dataset="medium-expert"
@@ -13,15 +14,15 @@ env_name="halfcheetah-medium-expert-v2"
 # dataset="medium"
 # dataset="random"
 # seeds=(0 1 2)
-seeds=(10)
+seeds=($(seq 1 32))
 # k_values=(10 12 15)
 k_values=(5)
 rule_based_dataset_files=(
-    "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
-    "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
-    "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
-    "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl"
-    "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl"
+    # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
+    # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
+    # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl"
+    # "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl"
+    # "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_8000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_8000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_8000.pkl"
@@ -36,6 +37,9 @@ rule_based_dataset_files=(
     # "datasets/rule_based/MDPtakeball/fixed_1_20000.pkl"
     # "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl"
     # "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-extra-good/batch_8000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-extra-bad/batch_20000.pkl"
+    "datasets/rule_based/MiniGrid-Reacher-extra-med/batch_20000.pkl"
 )
 SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"
@@ -45,9 +49,12 @@ for seed in "${seeds[@]}"; do
         CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/DEC.py \
             --env "${env_name}" \
             --seed "$seed" \
-            --project "0129DEC_different K" \
+            --project "DEC_v1" \
             --max_updates 400 \
             --K_value "$k" \
-            --rule_based_dataset_files "${rule_based_dataset_files[@]}"
+            --rule_based_dataset_files "${rule_based_dataset_files[@]}" \
+            --attention "True" \
+            --encoder_heads 1\
+            
     done
 done
