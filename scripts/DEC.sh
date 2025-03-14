@@ -14,9 +14,9 @@ env_name="MiniGrid-Reacher-extra-good"
 # dataset="medium"
 # dataset="random"
 # seeds=(0 1 2)
-seeds=($(seq 1 32))
+seeds=($(seq 1 16))
 # k_values=(10 12 15)
-k_values=(5)
+k_values=(3)
 rule_based_dataset_files=(
     # "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl"
     # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl"
@@ -49,12 +49,12 @@ for seed in "${seeds[@]}"; do
         CUDA_VISIBLE_DEVICES=$SELECTED_GPU python algos/DEC.py \
             --env "${env_name}" \
             --seed "$seed" \
-            --project "DEC_v1" \
+            --project "DEC_test" \
             --max_updates 400 \
             --K_value "$k" \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}" \
-            --attention "True" \
             --encoder_heads 1\
+            # --attention "True" \
             
     done
 done

@@ -647,10 +647,11 @@ class DEC(nn.Module):
     
     attention: bool = False
     encoder_heads: int = 4
+    qk_dim: int = 1
 
     def setup(self):
         if self.attention:
-            self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+            self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads, qk_dim=self.qk_dim)
         else:
             self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
         self.cluster_layer = ClusteringLayer(self.n_clusters, self.latent_dim)

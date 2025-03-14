@@ -81,11 +81,13 @@ class TrainConfig:
     project: str = "1017VAEKmeans"
     group: str = "PKmeans"
     name: str = ""
+    algo: str = "DEC"
 
     extra_reward: float = 0.5
 
-    attention: bool = False
+    encoder_attention: bool = False
     encoder_heads: int = 4
+    encoder_hidden_dim: int = 32
     qk_dim: int = 1
 
     def __post_init__(self):
@@ -236,7 +238,7 @@ def train(config):
 
     # Initialize model and optimizer
     True_k_value = int(jnp.max(data_idx)) + 1
-    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=(config.env not in D4RL_envs), attention=config.attention, encoder_heads=config.encoder_heads)
+    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=(config.env not in D4RL_envs), attention=config.encoder_attention, encoder_heads=config.encoder_heads, Encoder_hidden_dim=config.encoder_hidden_dim, qk_dim=config.qk_dim)
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
     act_init = jnp.zeros((2, 1, 1)) if not(config.env in D4RL_envs) else jnp.zeros((2, 1, env.action_space.shape[0]))
