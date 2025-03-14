@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,VQVAE_modify
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
-from utils.load_dataset import load_datasets, load_rule_based_datasets, Transitions
+from utils.load_dataset import Transitions, load, load_env
 
 @dataclass
 class TrainConfig:
@@ -167,25 +167,7 @@ def train(config):
     # Set random seed
     rng = jax.random.PRNGKey(config.seed)
     np.random.seed(config.seed)
-    if config.env == "MiniGrid-Reacher":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Binary-Reacher":
-        env = FixedGridworld(K=3, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Reacher-noisy":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=0.5)
-    elif config.env == "MiniGrid-Reacher-extra-good":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-bad":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-med":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
-    elif config.env == "MiniGrid-Reacher-MDP":
-        env = MDPGridworld(max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon)
-    elif config.env == "MDPtakeball":
-        env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target))
-    else:
-        env = gym.make(config.env)
-        # raise ValueError("Environment: ", config.env, " not supported") 
+    env=load_env(config)
     D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2"]
     
     if config.env in D4RL_envs:
@@ -198,47 +180,7 @@ def train(config):
     
     print(f"State dim: {config.state_dim}, Action dim: {config.action_dim}")
     
-    
-    # load dataset from local if exists
-    dataset_filename = config.env + "/" + "|".join([str(size) for size in config.dataset_sizes]) + ".pkl"
-    if config.env in D4RL_envs:
-        print("Load dataset from local: ", f"datasets/{config.env}.hdf5")
-        with h5py.File(f"datasets/{config.env}.hdf5", "r") as f:
-            obs = jnp.array(f["obs"][:])
-            action = jnp.array(f["action"][:])
-            reward = jnp.array(f["reward"][:])
-            done = jnp.array(f["done"][:])
-        dataset = Transitions(obs, action, reward, done)
-        returns = dataset.reward.sum(axis=1)
-        cumsum_returns = jnp.cumsum(returns)
-        medium_avg = cumsum_returns / jnp.arange(1, len(returns) + 1)
-        total_sum = cumsum_returns[-1]
-        expert_avg = (total_sum - cumsum_returns[:-1]) / jnp.arange(len(returns) - 1, 0, -1)
-        diff = expert_avg - medium_avg[:-1]
-        expert_start_idx = jnp.argmax(diff)
-        print("This info only works for med-expert dataset. Expert start idx: ", expert_start_idx)
-        print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
-        print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
-        data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"] or config.load_from_rule_based_dataset:
-        dataset, data_idx = load_rule_based_datasets(config)
-
-        # cnt=[0]*(int(jnp.max(data_idx)) + 1)
-        # for i in range(len(data_idx)):
-        #     idx=round(data_idx[i])
-        #     if cnt[idx]<5:
-        #         cnt[idx]+=1
-        #         env.visualize_obs(dataset.obs[i].reshape(-1,7,7,4),f"logs/{config.env}_{idx}_{cnt[idx]}.gif",dataset.reward[i],dataset.action[i])
-    elif not os.path.exists("datasets/" + dataset_filename):
-        dataset, data_idx = load_datasets(config)
-    else:
-        with open("datasets/" + dataset_filename, "rb") as f:
-            data = pickle.load(f)
-            dataset = data["dataset"]
-            data_idx = data["data_idx"]
-    print("Dataset loaded, dataset size: ", dataset.obs.shape[0])
-    # set the last done to be True if the episode is not done
-    dataset = dataset._replace(done=jnp.concatenate([dataset.done[:, :-1], jnp.ones_like(dataset.done[:, -1:])], axis=1))
+    dataset, data_idx = load(config)
     
     if config.true_k_available:
         true_k = int(jnp.max(data_idx)) + 1
@@ -345,6 +287,7 @@ def train(config):
             def loss_fn(params, batch, rng):
                 obs, action, reward, done = batch
                 done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+                # jax.debug.print("{}",done_mask.sum())
                 if method == 'vae':
                     pi, mu, log_var = vae.apply(params, (obs, done), action, rng)
                     recon_loss = -pi.log_prob(action)
