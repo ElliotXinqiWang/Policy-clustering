@@ -235,11 +235,13 @@ def train(config):
     )
 
     rng, super_rng = jax.random.split(rng)
+    if config.supervise_sample==-1:
+        config.supervise_sample=len(dataset.obs)
     spuer_idx = jax.random.choice(super_rng, a=len(dataset.obs), shape=(config.supervise_sample,), replace=False)
     obs_idx=jnp.ones_like(data_idx)*(-1)
     obs_idx = obs_idx.at[spuer_idx].set(data_idx[spuer_idx])
     obs_idx=jnp.round(obs_idx).astype(jnp.int32)
-    print("obs_idx:", obs_idx)
+    print("obs_idx max: ", jnp.max(obs_idx), "min: ", jnp.min(obs_idx))
     
     paded_size = math.ceil(len(dataset.obs) / config.batch_size) * config.batch_size
     # Training step
@@ -248,7 +250,8 @@ def train(config):
         rng, shuffle_rng = jax.random.split(rng) 
         shuffle_idx = jax.random.permutation(shuffle_rng, len(obs))
         
-        pad_idx = jax.random.choice(rng, a=config.batch_size, shape=(paded_size - len(obs),), replace=False)
+        # pad_idx = jax.random.choice(rng, a=config.batch_size, shape=(paded_size - len(obs),), replace=False)
+        pad_idx = jax.random.choice(rng, a=config.batch_size, shape=(paded_size - len(obs),))
         shuffle_and_pad = lambda x: jnp.concatenate((x[shuffle_idx], x[pad_idx]), axis=0)
         batchify = lambda x: jnp.reshape(x, [-1, config.batch_size] + list(x.shape[1:]))
         preprocess = lambda x: jnp.swapaxes(batchify(shuffle_and_pad(x)), 1, 2)
@@ -270,9 +273,10 @@ def train(config):
                 # jax.debug.print("{}",done_mask.sum())
                 pi, z, mat = vae.apply(params, (obs, done), action)
                 id=jnp.where(idx!=-1, idx, jnp.argmax(mat, axis=-1))
-                print("idx:", idx[:5])
-                print("id:", id[:5])
-                loss=mat[jnp.arange(mat.shape[0]),id].mean()
+                # jax.debug.print("idx max: {}, min: {}",jnp.max(idx),jnp.min(idx))
+                # jax.debug.print("id max: {}, min: {}",jnp.max(id),jnp.min(id))
+                # jax.debug.print("id: {}, idx: {}",id[:20],idx[:20])
+                loss=-mat[jnp.arange(mat.shape[0]),id].mean()*config.vqvae_alpha
                 recon_loss = -pi.log_prob(action)
                 recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                 return loss + recon_loss
@@ -285,10 +289,11 @@ def train(config):
         train_state, rng = train_state_rng
         return train_state, loss.mean()
     epoch_step=jax.jit(epoch_step_func, static_argnames=('method'))
-    
+
     loss_history = []
     for i in range(config.max_updates):
         rng, update_rng = jax.random.split(rng)
+        train_state, loss = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
         train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")

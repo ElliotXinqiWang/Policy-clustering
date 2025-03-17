@@ -24,8 +24,8 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 # runtimes=256
-# runtimes=16
-runtimes=1
+runtimes=16
+# runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
@@ -50,10 +50,10 @@ lr_decay_v1=40
 lr_decay_v2=360
 lr_decay_v3=0.1
 
-supervise_sample=16
+supervise_sample=8
 
-# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
-envs=['MDPtakeball']
+envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
+# envs=['MiniGrid-Reacher-extra-good']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
