@@ -275,6 +275,9 @@ if __name__ == "__main__":
     elif config.env == "MDPtakeball":
         env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target))
         agent = MDP_takeball_agent(env, mode=int(config.take_ball_target))
+    elif config.env == "MDPtakeball-hard":
+        env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target), random_ball_idx=True)
+        agent = MDP_takeball_agent(env, mode=int(config.take_ball_target))
     else:
         raise ValueError("Environment: ", config.env, " not supported") 
     rng = jax.random.PRNGKey(config.seed)
