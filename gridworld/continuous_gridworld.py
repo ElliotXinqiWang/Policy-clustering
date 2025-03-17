@@ -5,6 +5,7 @@ from flax import struct
 # from gymnax.environments.spaces import Box
 from typing import Tuple, Dict
 import matplotlib.pyplot as plt
+from matplotlib import animation
 
 @struct.dataclass
 class SingleState:
@@ -20,8 +21,8 @@ class SingleAgentEnv:
     def __init__(self,
                  n_barriers: int = 1,
                  max_steps: int = 100,
-                 agent_size: float = 0.05,
-                 barrier_size: float = 0.05,
+                 agent_size: float = 0.3,
+                 barrier_size: float = 0.3,
                  contact_force: float = 0.1,
                  noise_constant: float = 0.01):
         """Initialize a single-agent environment with optional barriers."""
@@ -57,7 +58,7 @@ class SingleAgentEnv:
         barriers = jnp.zeros((self.n_barriers, 2))
 
         done = False
-        step = 0
+        step = jnp.array(0)
         goal = jnp.array([1.0, 1.0])
         state = SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
         obs = self.get_obs(state)
@@ -95,6 +96,8 @@ class SingleAgentEnv:
         collision_forces = jax.vmap(lambda b: (state.p_pos - b))(state.barriers) * self.contact_force * collision_results[:, None]
         collision_forces = collision_forces.sum(axis=0)
         
+        # clip action to be within [-1, 1]
+        action = jnp.clip(action, -1.0, 1.0)
         action_forces = action * force_scale
         key, noise_key = jax.random.split(key)
         noise_force = jax.random.normal(key, shape=(2,)) * self.noise_constant
@@ -110,7 +113,6 @@ class SingleAgentEnv:
         # dist_to_goal = jnp.linalg.norm(new_pos - state.goal)
         # done = (dist_to_goal < 0.1) | (state.step >= self.max_steps)
         done = state.step >= self.max_steps
-
         # Tentative new state
         new_state = SingleState(
             p_pos=new_pos,
@@ -152,38 +154,37 @@ class SingleAgentEnv:
 
     def visualize_states(self, states: list, filename: str = "gridworld.gif", rewards=None, actions=None, interval=500):
         """Creates a GIF from a list of states."""
-        grid_size = self.grid_size
         fig, ax = plt.subplots(figsize=(5, 5))
         s = states
         def update(frame):
             ax.clear()
-            ax.set_xlim(-2, 4)
-            ax.set_ylim(-2, 4)
+            ax.set_xlim(-2, 2)
+            ax.set_ylim(-2, 2)
             # Agent
-            ax.scatter(s.p_pos[frame][0], s.p_pos[frame][1], label="Agent")
+            ax.scatter(s.p_pos[frame][0], s.p_pos[frame][1], label="Agent", s=200 * self.agent_size)
             # Goal
-            ax.scatter(s.goal[frame][0], s.goal[frame][1], marker="x", label="Goal")
+            ax.scatter(s.goal[frame][0], s.goal[frame][1], marker="x", label="Goal", s=200 * self.agent_size)
             # Barriers
             for i in range(self.n_barriers):
-                ax.scatter(s.barriers[frame][i, 0], s.barriers[frame][i, 1], marker="s", label=f"Barrier {i}")
+                ax.scatter(s.barriers[frame][i, 0], s.barriers[frame][i, 1], marker="s", label=f"Barrier {i}", s=400 * self.barrier_size)
             ax.legend()
             # Add rewards and actions if provided
             if rewards is not None:
                 ax.text(
-                    grid_size - 1.5, -0.8,
+                    3 - 1.5, -1.4,
                     f"Reward: {rewards[frame]:.2f}" if frame < len(rewards) else "Reward: N/A",
                     ha="right", va="center", fontsize=10, color="blue", weight="bold"
                 )
 
             if actions is not None:
                 ax.text(
-                    grid_size - 1.5, -1.2,
+                    3 - 1.5, -1.8,
                     f"Action: {actions[frame]}" if frame < len(actions) else "Action: N/A",
                     ha="right", va="center", fontsize=10, color="green", weight="bold"
                 )
             
          # Create animation
-        ani = animation.FuncAnimation(fig, update, frames=len(states), interval=interval)
+        ani = animation.FuncAnimation(fig, update, frames=len(states.p_pos), interval=interval)
         ani.save(filename, writer="imagemagick")
         plt.close(fig)
         print("Saved GIF to", filename)
