@@ -574,6 +574,73 @@ class VQVAE_modify(nn.Module):
         print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
         return pi, z, loss
+    
+class VQVAE_modify_few_sample(nn.Module):
+    latent_dim: int
+    Encoder_hidden_dim: int
+    action_dim: int
+    discrete_policy: bool
+    k: int
+    alpha: float
+    # beta: float # beta is set to 1
+
+    attention: bool
+    encoder_heads: int = 4
+    pre_process: str = 'rnn'
+    pre_process_layers: int = 1
+
+    use_sigma: bool = False
+
+    def setup(self):
+        if self.attention:
+            if self.pre_process == 'none':
+                self.pre_process = "self_attention"
+                self.pre_process_layers = 0
+            if self.pre_process == 'rnn':
+                self.encoder = Encoder_rnn_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads)
+            elif self.pre_process == 'self_attention':
+                self.encoder = Encoder_self_attention(self.latent_dim, self.Encoder_hidden_dim, self.encoder_heads, self.pre_process_layers)
+            else:
+                raise ValueError(f"pre_process {self.pre_process} not supported")
+        else:
+            self.encoder = Encoder(self.latent_dim, self.Encoder_hidden_dim)
+        if self.discrete_policy:
+            self.decoder = Decoder(self.action_dim)
+        else:
+            self.decoder = ContinuousDecoder(self.action_dim)
+
+        # self.mu is the codebook
+        self.mu = self.param('mu', nn.initializers.normal(1), (self.k, self.latent_dim))
+        if self.use_sigma:
+            self.sigma = self.param('sigma', lambda r: jnp.array(1.))
+        else:
+            self.sigma = jnp.array(1.)
+        # if self.use_sigma:
+        #     def init_param(key,shape):
+        #         k, d, _ = shape
+        #         return jnp.tile(jnp.eye(d)[None,:,:],(k,1,1))#+jax.random.normal(key,(k,d,d))*0.001
+        #     self.sigma = self.param('sigma', init_param, (self.k, self.latent_dim,self.latent_dim))
+        # else:
+        #     self.sigma = jnp.tile(jnp.eye(self.latent_dim)[None,:,:],(self.k,1,1))
+        
+    def log_pdf(self, x, mu): # return (batch_size, k)
+        x=x[:,None,:]-mu[None,:,:]
+        return -0.5*jnp.sum(x**2,axis=-1)*jnp.abs(self.sigma) - 0.5*jnp.log(jnp.abs(self.sigma)+1e-5)
+        x=x[:,:,:,None]# (batch_size, k, latent_dim, 1)
+        sigma=1/2*(self.sigma+self.sigma.transpose((0,2,1))) # make sure sigma is symmetric
+        return -0.5*(x.transpose((0,1,3,2))@sigma@x).reshape(x.shape[0],x.shape[1])\
+               -0.5*jnp.log(jnp.linalg.det(sigma)+1e-5)
+    
+    def reparameterize(self, z):
+        mat=self.log_pdf(z,self.mu)
+        return z, mat
+
+    def __call__(self, x, act):
+        mu, log_var = self.encoder(x, act)  # Encode
+        z, mat = self.reparameterize(mu)  # Reparameterization
+        print(mu.shape,z.shape)
+        pi = self.decoder(z, x)  # Decode
+        return pi, z, mat
 class VQVAE_gumble_softmax(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
