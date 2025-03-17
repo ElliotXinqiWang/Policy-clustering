@@ -4,6 +4,7 @@ env_name="MiniGrid-Reacher-extra-good"
 # env_name="MiniGrid-Reacher-extra-bad"
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
+# env_name="MDPtakeball-hard"
 agent_modes=("balanced" "zigzag2" "zigzag1" "downfirst" "rightfirst")
 takeball_targets=(0 1 2 3)
 # takeball_targets=(0)

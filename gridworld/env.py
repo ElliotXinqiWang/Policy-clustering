@@ -730,7 +730,7 @@ class MDPtakeball(SingleAgentGridworld):
     4 balls with index 0 to 3 are randomly placed at the 5 positions in the grid. All the balls will disappear when the agent get one of them.
     The agents goal is to take the ball and reach the goal position.
     """
-    def __init__(self, distance_penalty: float = -0.3, max_steps: int = 40, goal_reward: float = 10.0, epsilon: float = 0.00, target_ball=0):
+    def __init__(self, distance_penalty: float = -0.3, max_steps: int = 40, goal_reward: float = 10.0, epsilon: float = 0.00, target_ball=0, random_ball_idx=False):
         super().__init__(grid_size=9, max_steps=max_steps, distance_penalty=distance_penalty, goal_reward=goal_reward, epsilon=epsilon)
         self.name = "MDPGridworld"
         self.observation_shape = jnp.array((9, 9, 7))
@@ -749,10 +749,17 @@ class MDPtakeball(SingleAgentGridworld):
         self.goal_pos = jnp.array([7, 7])
         self.ball_poss = jnp.array([[1, 1], [1, 3], [1, 5], [1, 7]])
         self.target_ball = target_ball
+        self.random_ball_idx = random_ball_idx
         
     def reset(self, key: chex.PRNGKey) -> Tuple[chex.Array, State]:
         h, w = self.grid_size, self.grid_size
         spawn_pos_y = jax.random.randint(key, (1,), minval=1, maxval=4)[0]
+        ball_dixs = lax.cond(
+            self.random_ball_idx,
+            lambda _: jax.random.permutation(key, jnp.arange(4)),
+            lambda _: jnp.array([0, 1, 2, 3]),
+            None
+        )
         state = State(
             agent_pos=jnp.array([7, spawn_pos_y]),
             goal_pos=self.goal_pos,
@@ -760,8 +767,7 @@ class MDPtakeball(SingleAgentGridworld):
             time=0,
             terminal=False,
             info={
-                # "balls_idx": jax.random.permutation(key, jnp.arange(4)), # the index of the balls from left to right
-                "balls_idx": jnp.array([0, 1, 2, 3]), # fixed index of the balls
+                "balls_idx": ball_dixs,
                 "ball_got": -1} # the index of the ball that the agent got
         )
         obs = self.get_obs(state)
