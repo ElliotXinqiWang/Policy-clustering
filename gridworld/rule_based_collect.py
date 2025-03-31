@@ -283,7 +283,7 @@ if __name__ == "__main__":
     rng = jax.random.PRNGKey(config.seed)
     save_dir = "datasets/rule_based/" + config.env
     filename = config.filename
-    if config.env == "MiniGrid-Reacher-MDP" or config.env == "MDPtakeball":
+    if config.env == "MiniGrid-Reacher-MDP" or config.env == "MDPtakeball" or config.env == "MDPtakeball-hard":
         # we can collect MDP data with jax.jit
         with jax.disable_jit(disable=False):
             rng, batch = MDP_get_one_trajectory(env, agent, rng, num_trajectories=config.n_episodes, save_dir=save_dir, filename=filename)

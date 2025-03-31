@@ -211,7 +211,7 @@ def load_env(config):
         env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
     elif config.env == "MiniGrid-Reacher-MDP":
         env = MDPGridworld(max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon)
-    elif config.env == "MDPtakeball":
+    elif config.env == "MDPtakeball" or config.env == "MDPtakeball-hard":
         env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target))
     else:
         env = gym.make(config.env)

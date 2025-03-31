@@ -253,6 +253,7 @@ class Encoder_rnn_attention(nn.Module):
     @nn.compact
     def __call__(self, x, act):
         obs, done = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size), act: (seq_len, batch_size) or (seq_len, batch_size, act_dim)
+        print("act shape", act.shape)
         act=act.reshape(act.shape[0],act.shape[1],-1)
         done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
         seq_len = obs.shape[0]
@@ -263,6 +264,7 @@ class Encoder_rnn_attention(nn.Module):
         embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
         # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
         embedding_act = act
+        print("act shape", embedding_act.shape)
         embedding_act = nn.relu(nn.Dense(32)(embedding_act))
         embedding_act = nn.relu(nn.Dense(128)(embedding_act))
         embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)

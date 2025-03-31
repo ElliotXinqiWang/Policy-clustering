@@ -207,13 +207,13 @@ def train(config):
     # Shuffle the dataset
     dataset = dataset._replace(obs=(dataset.obs - state_mean) / state_std)
 
-    # idx = jax.random.permutation(rng, len(dataset.obs))
-    # dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
+    idx = jax.random.permutation(rng, len(dataset.obs))
+    dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
     # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    # data_idx = data_idx[idx]
+    data_idx = data_idx[idx]
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
-    DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
+    DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball", "MDPtakeball-hard"]
     if config.algo == "vae":
         vae = VAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, discrete_action=(config.env in DiscreteEnvNames))
     elif config.algo == "vqvae":
@@ -354,6 +354,15 @@ def train(config):
         else:
             raise ValueError("Unknown method: ", method)
     encode = jax.jit(encode_func, static_argnames=('method'))
+    
+    # print(data_idx[:20])
+    rng, test_rng = jax.random.split(rng)
+    idx = jax.random.permutation(test_rng, len(dataset.obs))
+    dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
+    # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
+    data_idx = data_idx[idx]
+    # print(data_idx[:20])
+
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)
     latent_representations = encode(train_state.params, (pred_obs, pred_done), jnp.swapaxes(dataset.action,0,1), rng, method=config.algo)

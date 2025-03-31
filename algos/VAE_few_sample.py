@@ -198,13 +198,13 @@ def train(config):
     # Shuffle the dataset
     dataset = dataset._replace(obs=(dataset.obs - state_mean) / state_std)
 
-    # idx = jax.random.permutation(rng, len(dataset.obs))
-    # dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
+    idx = jax.random.permutation(rng, len(dataset.obs))
+    dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
     # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    # data_idx = data_idx[idx]
+    data_idx = data_idx[idx]
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
-    DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball"]
+    DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball", "MDPtakeball-hard"]
     if config.algo == "vqvae_modify_few_sample":
         vae = VQVAE_modify_few_sample(
             latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha,
@@ -293,7 +293,8 @@ def train(config):
     loss_history = []
     for i in range(config.max_updates):
         rng, update_rng = jax.random.split(rng)
-        train_state, loss = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
+        if config.supervise_sample:
+            train_state, loss = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
         train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
@@ -307,6 +308,13 @@ def train(config):
         pi, z, loss = vae.apply(params, x, act)
         return z
     encode = jax.jit(encode_func, static_argnames=('method'))
+
+    rng, test_rng = jax.random.split(rng)
+    idx = jax.random.permutation(test_rng, len(dataset.obs))
+    dataset = Transitions(dataset.obs[idx], dataset.action[idx], dataset.reward[idx], dataset.done[idx])
+    # data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
+    data_idx = data_idx[idx]
+
     pred_obs = jnp.swapaxes(dataset.obs, 0, 1)
     pred_done = jnp.swapaxes(dataset.done, 0, 1)
     latent_representations = encode(train_state.params, (pred_obs, pred_done), jnp.swapaxes(dataset.action,0,1), rng, method=config.algo)

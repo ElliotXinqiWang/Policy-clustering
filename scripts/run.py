@@ -7,7 +7,8 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-algo="vqvae_modify_few_sample"
+algo="vqvae_modify"
+# algo="vqvae_modify_few_sample"
 # algo="vqvae"
 # algo="DEC"
 # project="vae_v1.24"
@@ -50,10 +51,11 @@ lr_decay_v1=40
 lr_decay_v2=360
 lr_decay_v3=0.1
 
-supervise_sample=8
+supervise_sample=-1
 
-envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
-# envs=['MiniGrid-Reacher-extra-good']
+# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
+# envs=['MDPtakeball-hard']
+envs=['MiniGrid-Reacher-extra-good']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
@@ -75,6 +77,13 @@ for env_name in envs:
             "datasets/rule_based/MDPtakeball/fixed_1_20000.pkl",
             "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl",
             "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl",
+        ]
+    elif env_name == "MDPtakeball-hard":
+        rule_based_dataset_files=[
+            "datasets/rule_based/MDPtakeball-hard/fixed_0_20000.pkl",
+            "datasets/rule_based/MDPtakeball-hard/fixed_1_20000.pkl",
+            "datasets/rule_based/MDPtakeball-hard/fixed_2_20000.pkl",
+            "datasets/rule_based/MDPtakeball-hard/fixed_3_20000.pkl",
         ]
     elif env_name == "MiniGrid-Reacher-extra-good":
         rule_based_dataset_files=[
