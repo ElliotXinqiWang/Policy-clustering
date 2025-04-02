@@ -7,8 +7,8 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-algo="vqvae_modify"
-# algo="vqvae_modify_few_sample"
+# algo="vqvae_modify"
+algo="vqvae_modify_few_sample"
 # algo="vqvae"
 # algo="DEC"
 # project="vae_v1.24"
@@ -38,7 +38,7 @@ learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.2a"
+project="vqvae_v1.2d"
 batch_size=512
 vqvae_modify_use_sigma=False
 vqvae_modify_sum_method="sum"
@@ -51,11 +51,11 @@ lr_decay_v1=40
 lr_decay_v2=360
 lr_decay_v3=0.1
 
-supervise_sample=-1
+supervise_sample=100
 
 # envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
-# envs=['MDPtakeball-hard']
-envs=['MiniGrid-Reacher-extra-good']
+envs=['MDPtakeball-hard']
+# envs=['MiniGrid-Reacher-extra-good']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"

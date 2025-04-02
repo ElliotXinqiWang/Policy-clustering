@@ -633,16 +633,19 @@ class VQVAE_modify_few_sample(nn.Module):
         return -0.5*(x.transpose((0,1,3,2))@sigma@x).reshape(x.shape[0],x.shape[1])\
                -0.5*jnp.log(jnp.linalg.det(sigma)+1e-5)
     
-    def reparameterize(self, z):
+    def calc(self, z):
         mat=self.log_pdf(z,self.mu)
-        return z, mat
+        sloss=self.log_pdf(self.mu,self.mu)
+        sloss=jnp.maximum(sloss, -jnp.ones_like(sloss)).mean()
+        return z, mat, sloss
 
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode
-        z, mat = self.reparameterize(mu)  # Reparameterization
-        print(mu.shape,z.shape)
+        z, mat, sloss = self.calc(mu)  # Reparameterization
+        # print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
-        return pi, z, mat
+        # jax.debug.print("sloss {}", sloss)
+        return pi, z, mat, sloss
 class VQVAE_gumble_softmax(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int

@@ -245,6 +245,20 @@ def train(config):
     
     paded_size = math.ceil(len(dataset.obs) / config.batch_size) * config.batch_size
     # Training step
+
+    def error_rate_func(params, batch):
+        obs, action, reward, done, idx = batch
+        obs = jnp.swapaxes(obs, 0, 1)
+        done = jnp.swapaxes(done, 0, 1)
+        action = jnp.swapaxes(action, 0, 1)
+        done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
+        pi, z, mat, loss = vae.apply(params, (obs, done), action)
+        # print("shape:",idx.shape, mat.shape,obs.shape)
+        id=jnp.argmax(mat, axis=-1)
+        err=jnp.sum(id != idx) / idx.shape[0]
+        return err
+    error_rate = jax.jit(error_rate_func)
+
     def epoch_step_func(runner_state, iter, method='vae'): 
         train_state, obs, action, reward, done, idx, rng = runner_state
         rng, shuffle_rng = jax.random.split(rng) 
@@ -271,7 +285,9 @@ def train(config):
                 obs, action, reward, done, idx = batch
                 done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
                 # jax.debug.print("{}",done_mask.sum())
-                pi, z, mat = vae.apply(params, (obs, done), action)
+                pi, z, mat, sloss = vae.apply(params, (obs, done), action)
+                sloss=-sloss
+                # sloss=jnp.minimum(-sloss,1)
                 id=jnp.where(idx!=-1, idx, jnp.argmax(mat, axis=-1))
                 # jax.debug.print("idx max: {}, min: {}",jnp.max(idx),jnp.min(idx))
                 # jax.debug.print("id max: {}, min: {}",jnp.max(id),jnp.min(id))
@@ -279,7 +295,7 @@ def train(config):
                 loss=-mat[jnp.arange(mat.shape[0]),id].mean()*config.vqvae_alpha
                 recon_loss = -pi.log_prob(action)
                 recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
-                return loss + recon_loss
+                return loss + recon_loss - sloss
             grad_fn = jax.value_and_grad(loss_fn)
             rng, vae_rng = jax.random.split(rng)
             loss, grad = grad_fn(train_state.params, batch, vae_rng)
@@ -293,19 +309,30 @@ def train(config):
     loss_history = []
     for i in range(config.max_updates):
         rng, update_rng = jax.random.split(rng)
+        err = -1
         if config.supervise_sample:
-            train_state, loss = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
+            while True:
+                rng, update_rng = jax.random.split(rng)
+                train_state, _ = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
+                err = error_rate(train_state.params, (dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx]))
+                # print("Loss: ", _, "Error rate: ", err)
+                if err < 0.1:
+                    break
         train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
+        if config.supervise_sample:
+            rng, update_rng = jax.random.split(rng)
+            train_state, _ = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
+            err = error_rate(train_state.params, (dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx]))
         loss_history.append(loss)
-        print(f"Update {i}, Loss: {loss}")
-        wandb.log({"Loss": loss})
+        print(f"Update {i}, Loss: {loss}, Error: {err}")
+        wandb.log({"Loss": loss, "Error": err})
         if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
             break
     print("Training finished after ", i, " updates")
     
     # Encode data into latent space
     def encode_func(params, x, act, rng, method='vae'):
-        pi, z, loss = vae.apply(params, x, act)
+        pi, z, loss, _loss = vae.apply(params, x, act)
         return z
     encode = jax.jit(encode_func, static_argnames=('method'))
 
