@@ -9,12 +9,13 @@ random.seed()
 
 # algo="vqvae_modify"
 algo="vqvae_modify_few_sample"
+# algo="vqvae_modify_self_train"
 # algo="vqvae"
 # algo="DEC"
 # project="vae_v1.24"
 if algo=="DEC":
     origin_path="algos/DEC.py"
-elif algo=="vqvae_modify_few_sample":
+elif algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
     origin_path="algos/VAE_few_sample.py"
 elif algo=="vqvae_modify":
     origin_path="algos/VAE_kmeans.py"
@@ -31,6 +32,7 @@ runtimes=16
 vqvae_alpha=1
 vqvae_beta=1
 codebook=-1
+# max_updates=40
 max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
@@ -38,7 +40,7 @@ learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.2d"
+project="vqvae_v1.2g"
 batch_size=512
 vqvae_modify_use_sigma=False
 vqvae_modify_sum_method="sum"
@@ -52,6 +54,11 @@ lr_decay_v2=360
 lr_decay_v3=0.1
 
 supervise_sample=100
+supervise_samples=[40]
+while supervise_samples[-1] < 400:
+    supervise_samples.append(int(supervise_samples[-1]*1.1))
+print(supervise_samples)
+# exit(0)
 
 # envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
 envs=['MDPtakeball-hard']
@@ -62,7 +69,8 @@ envs=['MDPtakeball-hard']
 # env_name="MiniGrid-Reacher-extra-good"
 # env_name="halfcheetah"
 
-for env_name in envs:
+for supervise_sample in supervise_samples:
+  for env_name in envs:
     if env_name == "MiniGrid-Reacher-MDP":
         rule_based_dataset_files=[
             "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl",
@@ -132,7 +140,7 @@ for env_name in envs:
         command+=f"--seed {seed} "
         command+=f"--project {project} "
         command+=f"--max_updates {max_updates} "
-        if algo=="vqvae" or algo=="vqvae_modify" or algo=="vqvae_modify_few_sample":
+        if algo=="vqvae" or algo=="vqvae_modify" or algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
             command+=f"--vqvae_codebook {codebook} "
             command+=f"--vqvae_alpha {vqvae_alpha} "
         if algo=="vqvae" or algo=="vqvae_modify":
@@ -146,7 +154,7 @@ for env_name in envs:
             command+=f"--encoder_attention True "
             command+=f"--encoder_heads {encoder_heads} "
             command+=f"--encoder_hidden_dim {encoder_hidden_dim} "
-        if algo=="vqvae_modify" or algo=="vqvae_modify_few_sample":
+        if algo=="vqvae_modify" or algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
             if vqvae_modify_use_sigma:
                 command+=f"--vqvae_modify_use_sigma True "
             command+=f"--encoder_attention_pre_process {encoder_attention_pre_process} "
@@ -155,7 +163,7 @@ for env_name in envs:
         if algo=="vqvae_modify":
             command+=f"--vqvae_modify_sum_method {vqvae_modify_sum_method} "
             command+=f"--lr_decay {lr_decay} --lr_decay_v1 {lr_decay_v1} --lr_decay_v2 {lr_decay_v2} --lr_decay_v3 {lr_decay_v3} "
-        if algo=="vqvae_modify_few_sample":
+        if algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
             command+=f"--supervise_sample {supervise_sample} "
         command+=f"--batch_size {batch_size} "
         print(command)

@@ -205,7 +205,7 @@ def train(config):
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball", "MDPtakeball-hard"]
-    if config.algo == "vqvae_modify_few_sample":
+    if config.algo == "vqvae_modify_few_sample" or config.algo == "vqvae_modify_self_train":
         vae = VQVAE_modify_few_sample(
             latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha,
             discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
@@ -237,9 +237,9 @@ def train(config):
     rng, super_rng = jax.random.split(rng)
     if config.supervise_sample==-1:
         config.supervise_sample=len(dataset.obs)
-    spuer_idx = jax.random.choice(super_rng, a=len(dataset.obs), shape=(config.supervise_sample,), replace=False)
+    super_idx = jax.random.choice(super_rng, a=len(dataset.obs), shape=(config.supervise_sample,), replace=False)
     obs_idx=jnp.ones_like(data_idx)*(-1)
-    obs_idx = obs_idx.at[spuer_idx].set(data_idx[spuer_idx])
+    obs_idx = obs_idx.at[super_idx].set(data_idx[super_idx])
     obs_idx=jnp.round(obs_idx).astype(jnp.int32)
     print("obs_idx max: ", jnp.max(obs_idx), "min: ", jnp.min(obs_idx))
     
@@ -306,29 +306,66 @@ def train(config):
         return train_state, loss.mean()
     epoch_step=jax.jit(epoch_step_func, static_argnames=('method'))
 
-    loss_history = []
-    for i in range(config.max_updates):
-        rng, update_rng = jax.random.split(rng)
-        err = -1
-        if config.supervise_sample:
-            while True:
-                rng, update_rng = jax.random.split(rng)
-                train_state, _ = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
-                err = error_rate(train_state.params, (dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx]))
-                # print("Loss: ", _, "Error rate: ", err)
-                if err < 0.1:
-                    break
-        train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
-        if config.supervise_sample:
+    if config.algo=="vqvae_modify_few_sample":
+        loss_history = []
+        for i in range(config.max_updates):
             rng, update_rng = jax.random.split(rng)
-            train_state, _ = epoch_step((train_state, dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx], update_rng), i, method=config.algo)
-            err = error_rate(train_state.params, (dataset.obs[spuer_idx], dataset.action[spuer_idx], dataset.reward[spuer_idx], dataset.done[spuer_idx], obs_idx[spuer_idx]))
-        loss_history.append(loss)
-        print(f"Update {i}, Loss: {loss}, Error: {err}")
-        wandb.log({"Loss": loss, "Error": err})
-        if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
-            break
-    print("Training finished after ", i, " updates")
+            err = -1
+            if config.supervise_sample:
+                it=0
+                while True:
+                    it+=1
+                    rng, update_rng = jax.random.split(rng)
+                    train_state, _ = epoch_step((train_state, dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx], update_rng), i, method=config.algo)
+                    err = error_rate(train_state.params, (dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx]))
+                    # print("Loss: ", _, "Error rate: ", err)
+                    if err < 0.1 or it>10:
+                        break
+            train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
+            if config.supervise_sample:
+                rng, update_rng = jax.random.split(rng)
+                train_state, _ = epoch_step((train_state, dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx], update_rng), i, method=config.algo)
+                err = error_rate(train_state.params, (dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx]))
+            loss_history.append(loss)
+            print(f"Update {i}, Loss: {loss}, Error: {err}")
+            wandb.log({"Loss": loss, "Error": err})
+            if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4:
+                break
+        print("Training finished after ", i, " updates")
+    elif config.algo=="vqvae_modify_self_train":
+        fix_idx=super_idx
+        while len(fix_idx)<len(data_idx):
+            for i in range(config.max_updates):
+                rng, update_rng = jax.random.split(rng)
+                loss_history = []
+                err = -1
+                it = 0
+                while True:
+                    it += 1
+                    rng, update_rng = jax.random.split(rng)
+                    train_state, _ = epoch_step((train_state, dataset.obs[fix_idx], dataset.action[fix_idx], dataset.reward[fix_idx], dataset.done[fix_idx], obs_idx[fix_idx], update_rng), i, method=config.algo)
+                    err = error_rate(train_state.params, (dataset.obs[fix_idx], dataset.action[fix_idx], dataset.reward[fix_idx], dataset.done[fix_idx], obs_idx[fix_idx]))
+                    # print("Loss: ", _, "Error rate: ", err)
+                    if err < 0.1 or it > 10:
+                        break
+                train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
+                loss_history.append(loss)
+                print(f"Update {i}, Loss: {loss}")
+                wandb.log({"Loss": loss})
+                if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-3:
+                    break
+            print("Training finished after ", i, " updates")
+            _, _, mat, _= vae.apply(train_state.params, (jnp.swapaxes(dataset.obs,0,1),jnp.swapaxes(dataset.done,0,1)),jnp.swapaxes(dataset.action,0,1))
+            conf=jax.nn.softmax(mat,axis=-1).max(axis=-1)
+            conf=conf.at[fix_idx].set(0)
+            s_idx=jnp.argsort(conf,descending=True)
+            # print(fix_idx,s_idx[:min(len(fix_idx),len(data_idx)-len(fix_idx))])
+            fix_idx=jnp.concatenate([fix_idx,s_idx[:min(len(fix_idx)//2,len(data_idx)-len(fix_idx))]])
+            # print(fix_idx.dtype)
+            obs_idx=obs_idx.at[fix_idx].set(jnp.argmax(mat,axis=-1)[fix_idx])
+            err=error_rate(train_state.params, (dataset.obs[fix_idx], dataset.action[fix_idx], dataset.reward[fix_idx], dataset.done[fix_idx], data_idx[fix_idx]))
+            wandb.log({"Error": err})
+            print(f"Error: {err}")
     
     # Encode data into latent space
     def encode_func(params, x, act, rng, method='vae'):
