@@ -26,13 +26,13 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 # runtimes=256
-runtimes=16
-# runtimes=1
+# runtimes=16
+runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
 codebook=-1
-# max_updates=40
+# max_updates=10
 max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
@@ -40,7 +40,7 @@ learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.2g"
+project="vqvae_v1.2h"
 batch_size=512
 vqvae_modify_use_sigma=False
 vqvae_modify_sum_method="sum"
@@ -54,23 +54,25 @@ lr_decay_v2=360
 lr_decay_v3=0.1
 
 supervise_sample=100
-supervise_samples=[40]
-while supervise_samples[-1] < 400:
-    supervise_samples.append(int(supervise_samples[-1]*1.1))
-print(supervise_samples)
+# supervise_samples=[221]
+# while supervise_samples[-1] < 400:
+#     supervise_samples.append(int(supervise_samples[-1]*1.1))
+# supervise_samples=supervise_samples[1:]
+# print(supervise_samples)
 # exit(0)
 
 # envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
 envs=['MDPtakeball-hard']
 # envs=['MiniGrid-Reacher-extra-good']
+# envs=['MiniGrid-Reacher-MDP']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
 # env_name="MiniGrid-Reacher-extra-good"
 # env_name="halfcheetah"
 
-for supervise_sample in supervise_samples:
-  for env_name in envs:
+# for supervise_sample in supervise_samples:
+for env_name in envs:
     if env_name == "MiniGrid-Reacher-MDP":
         rule_based_dataset_files=[
             "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl",

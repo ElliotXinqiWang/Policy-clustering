@@ -16,6 +16,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "64"
 os.environ["MKL_NUM_THREADS"] = "64"
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 from sklearn.cluster import KMeans
+import utils.stat
 
 
 import optax
@@ -415,6 +416,16 @@ def train(config):
     # plt.ylabel("Latent Dimension 2")
     # plt.colorbar(label="Cluster")
     # plt.show()
+    reward = dataset.reward
+    action = dataset.action
+    obs = dataset.obs
+    # print(utils.stat.g(reward, 0.99))
+    # print(utils.stat.u(obs, action))
+    for i in range(config.k_value):
+        print(f"Cluster {i}:")
+        print(" TQ: ", utils.stat.g(reward[dataset_idxs[i]], 0.99)/utils.stat.g(reward, 0.99))
+        print(" SACo: ", utils.stat.u(obs[dataset_idxs[i]], action[dataset_idxs[i]])/utils.stat.u(obs, action))
+        print(" Number of samples: ", len(dataset_idxs[i]))
 
 
 
