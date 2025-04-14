@@ -8,9 +8,9 @@ gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PI
 random.seed()
 
 # algo="vqvae_modify"
-algo="vqvae_modify_few_sample"
+# algo="vqvae_modify_few_sample"
 # algo="vqvae_modify_self_train"
-# algo="vqvae"
+algo="vqvae"
 # algo="DEC"
 # project="vae_v1.24"
 if algo=="DEC":
@@ -26,13 +26,14 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 # runtimes=256
-# runtimes=16
-runtimes=1
+runtimes=16
+# runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
 codebook=-1
 # max_updates=10
+# max_updates=200
 max_updates=800
 load_from_rule_based_dataset=True
 encoder_attention=True
@@ -40,7 +41,7 @@ learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.2h"
+project="vqvae_v1.2t"
 batch_size=512
 vqvae_modify_use_sigma=False
 vqvae_modify_sum_method="sum"
@@ -62,7 +63,8 @@ supervise_sample=100
 # exit(0)
 
 # envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
-envs=['MDPtakeball-hard']
+envs=['halfcheetah']
+# envs=['MDPtakeball-hard']
 # envs=['MiniGrid-Reacher-extra-good']
 # envs=['MiniGrid-Reacher-MDP']
 
@@ -104,9 +106,10 @@ for env_name in envs:
         # vqvae_alpha=100
     else:
         dataset="medium-expert"
+        # dataset="medium-expert"
         env_name=f"{env_name}-{dataset}-v2"
         load_from_rule_based_dataset=False
-        max_updates=2000
+        # max_updates=2000
 
     def log_uniform(mi,mx):
         return mi*math.exp(random.random()*math.log(mx/mi))

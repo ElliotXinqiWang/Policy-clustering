@@ -335,7 +335,9 @@ def train(config):
         print("Training finished after ", i, " updates")
     elif config.algo=="vqvae_modify_self_train":
         fix_idx=super_idx
-        while len(fix_idx)<len(data_idx):
+        _it=0
+        while len(fix_idx)<len(data_idx) and _it<2:
+            _it+=1
             for i in range(config.max_updates):
                 rng, update_rng = jax.random.split(rng)
                 loss_history = []
@@ -359,6 +361,11 @@ def train(config):
             _, _, mat, _= vae.apply(train_state.params, (jnp.swapaxes(dataset.obs,0,1),jnp.swapaxes(dataset.done,0,1)),jnp.swapaxes(dataset.action,0,1))
             conf=jax.nn.softmax(mat,axis=-1).max(axis=-1)
             conf=conf.at[fix_idx].set(0)
+            import matplotlib.pyplot as plt
+            arr=np.array(jnp.sort(conf))
+            plt.plot(arr)
+            plt.grid(True)
+            plt.savefig(f"{_it}.png")
             s_idx=jnp.argsort(conf,descending=True)
             # print(fix_idx,s_idx[:min(len(fix_idx),len(data_idx)-len(fix_idx))])
             fix_idx=jnp.concatenate([fix_idx,s_idx[:min(len(fix_idx)//2,len(data_idx)-len(fix_idx))]])

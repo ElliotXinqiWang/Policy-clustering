@@ -44,7 +44,7 @@ for seed in "${seeds[@]}"; do
             --env "$env_name" \
             --K_value "$k" \
             --seed "$seed" \
-            --project "0126gridworldKmeansMDP_rule_based_large" \
+            --project "Kmeans_girdworld" \
             --max_updates 15 \
             --load_from_rule_based_dataset true \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"
