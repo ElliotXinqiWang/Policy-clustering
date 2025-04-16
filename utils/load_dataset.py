@@ -153,7 +153,7 @@ def load(config):
         
     # load dataset from local if exists
     dataset_filename = config.env + "/" + "|".join([str(size) for size in config.dataset_sizes]) + ".pkl"
-    D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2"]
+    D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2","halfcheetah-medium-replay-v2"]
 
     if config.env in D4RL_envs:
         print("Load dataset from local: ", f"datasets/{config.env}.hdf5")
@@ -165,15 +165,46 @@ def load(config):
         dataset = Transitions(obs, action, reward, done)
         returns = dataset.reward.sum(axis=1)
         cumsum_returns = jnp.cumsum(returns)
-        medium_avg = cumsum_returns / jnp.arange(1, len(returns) + 1)
-        total_sum = cumsum_returns[-1]
-        expert_avg = (total_sum - cumsum_returns[:-1]) / jnp.arange(len(returns) - 1, 0, -1)
-        diff = expert_avg - medium_avg[:-1]
-        expert_start_idx = jnp.argmax(diff)
-        print("This info only works for med-expert dataset. Expert start idx: ", expert_start_idx)
-        print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
-        print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
-        data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
+
+        sorted_returns = np.sort(returns)
+        plt.figure(figsize=(8, 6))
+        plt.plot(sorted_returns, marker='o', linestyle='-', color='b', label='Sorted Returns')
+        plt.xlabel('Index')
+        plt.ylabel('Return Value')
+        plt.title('Sorted Returns')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(f"{config.env}.png")
+
+        if "expert" in config.env:  # 如果是 medium-expert 数据集
+            medium_avg = cumsum_returns / jnp.arange(1, len(returns) + 1)
+            total_sum = cumsum_returns[-1]
+            expert_avg = (total_sum - cumsum_returns[:-1]) / jnp.arange(len(returns) - 1, 0, -1)
+            diff = expert_avg - medium_avg[:-1]
+            expert_start_idx = jnp.argmax(diff)
+
+            print("This info only works for med-expert dataset. Expert start idx: ", expert_start_idx)
+            print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
+            print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
+            
+            data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
+
+        elif "replay" in config.env:  # 如果是 medium-replay 数据集
+            # 假设"replay"类型数据是通过奖励进行区分的
+            replay_threshold = jnp.percentile(returns, 50)  # 例如通过奖励中位数来区分
+            print("Replay dataset detected. Reward median: ", replay_threshold)
+
+            # 根据奖励值来区分 `medium` 和 `replay`
+            data_idx = jnp.where(returns > replay_threshold, 1, 0)  # 1表示replay, 0表示medium
+
+            print(f"medium trajs: {jnp.sum(data_idx == 0)}, replay trajs: {jnp.sum(data_idx == 1)}")
+
+
+
+
+        else:
+            raise ValueError("Invalid dataset type. Expected 'medium-expert' or 'medium-replay'.")
+
     elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP"] or config.load_from_rule_based_dataset:
         dataset, data_idx = load_rule_based_datasets(config)
 

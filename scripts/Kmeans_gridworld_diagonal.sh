@@ -47,6 +47,7 @@ for seed in "${seeds[@]}"; do
             --project "Kmeans_girdworld" \
             --max_updates 15 \
             --load_from_rule_based_dataset true \
-            --rule_based_dataset_files "${rule_based_dataset_files[@]}"
+            --rule_based_dataset_files "${rule_based_dataset_files[@]}" \
+            # --learning_rate 0.01 
     done
 done

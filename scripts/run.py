@@ -7,10 +7,10 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-# algo="vqvae_modify"
+algo="vqvae_modify"
 # algo="vqvae_modify_few_sample"
 # algo="vqvae_modify_self_train"
-algo="vqvae"
+# algo="vqvae"
 # algo="DEC"
 # project="vae_v1.24"
 if algo=="DEC":
@@ -36,7 +36,7 @@ codebook=-1
 # max_updates=200
 max_updates=800
 load_from_rule_based_dataset=True
-encoder_attention=True
+encoder_attention=False
 learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
@@ -63,10 +63,10 @@ supervise_sample=100
 # exit(0)
 
 # envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
-envs=['halfcheetah']
+# envs=['halfcheetah']
 # envs=['MDPtakeball-hard']
 # envs=['MiniGrid-Reacher-extra-good']
-# envs=['MiniGrid-Reacher-MDP']
+envs=['MiniGrid-Reacher-MDP']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
@@ -81,7 +81,9 @@ for env_name in envs:
             "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl"
+            "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/random2_20000.pkl"
         ]
     elif env_name == "MDPtakeball":
         rule_based_dataset_files=[
@@ -106,7 +108,7 @@ for env_name in envs:
         # vqvae_alpha=100
     else:
         dataset="medium-expert"
-        # dataset="medium-expert"
+        # dataset="medium-replay"
         env_name=f"{env_name}-{dataset}-v2"
         load_from_rule_based_dataset=False
         # max_updates=2000

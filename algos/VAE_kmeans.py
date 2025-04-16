@@ -168,7 +168,8 @@ def train(config):
     rng = jax.random.PRNGKey(config.seed)
     np.random.seed(config.seed)
     env=load_env(config)
-    D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2"]
+    D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2","halfcheetah-medium-replay-v2"]
+    print(config.env, config.env in D4RL_envs)
     
     if config.env in D4RL_envs:
         config.state_dim = env.observation_space.shape[0]
