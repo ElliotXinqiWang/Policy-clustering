@@ -508,6 +508,7 @@ class VQVAE_modify(nn.Module):
     encoder_heads: int = 4
     pre_process: str = 'rnn'
     pre_process_layers: int = 1
+    gamma: float = 0
 
     use_sigma: bool = False
 
@@ -568,7 +569,9 @@ class VQVAE_modify(nn.Module):
         # loss = -jnp.max(pdf, axis=0).mean()*self.loss_weight
         loss = -self.sum(self.log_pdf(z,jax.lax.stop_gradient(self.mu))).mean() / (1+self.beta)
         loss+= -self.sum(self.log_pdf(jax.lax.stop_gradient(z),self.mu)).mean() * self.beta / (1+self.beta)
-        return z, loss * self.alpha
+
+        kl = jnp.sum((self.mu[:,None,:] - self.mu[None,:,:])**2, axis=-1)
+        return z, loss * self.alpha - jnp.minimum(kl,jnp.ones_like(kl)).mean() * self.gamma
 
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode

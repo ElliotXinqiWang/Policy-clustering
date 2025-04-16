@@ -225,7 +225,7 @@ def train(config):
                                    discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                                    k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)    
     elif config.algo == "vqvae_modify":
-        vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta,
+        vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta, gamma=config.vae_kl_weight,
                            discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
                            attention=config.encoder_attention, encoder_heads=config.encoder_heads,
                            use_sigma=config.vqvae_modify_use_sigma, method=config.vqvae_modify_sum_method,

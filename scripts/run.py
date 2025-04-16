@@ -31,6 +31,7 @@ runtimes=16
 
 vqvae_alpha=1
 vqvae_beta=1
+vae_kl_weight=1
 codebook=-1
 # max_updates=10
 # max_updates=200
@@ -170,6 +171,7 @@ for env_name in envs:
         if algo=="vqvae_modify":
             command+=f"--vqvae_modify_sum_method {vqvae_modify_sum_method} "
             command+=f"--lr_decay {lr_decay} --lr_decay_v1 {lr_decay_v1} --lr_decay_v2 {lr_decay_v2} --lr_decay_v3 {lr_decay_v3} "
+            command+=f"--vae_kl_weight {vae_kl_weight} "
         if algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
             command+=f"--supervise_sample {supervise_sample} "
         command+=f"--batch_size {batch_size} "
