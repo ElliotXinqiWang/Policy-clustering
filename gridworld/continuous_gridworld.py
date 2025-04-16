@@ -223,17 +223,21 @@ class SingleAgentEnv:
 
 class TwoBarriorEnv(SingleAgentEnv):
     def __init__(self, n_barriers: int = 2, **kwargs):
+        assert n_barriers > 0 and n_barriers<=7
         super().__init__(n_barriers=n_barriers, **kwargs)
     
-    def reset(self) -> SingleState:
+    def reset(self, key: chex.PRNGKey=None) -> SingleState:
         """Reset environment to default initial state."""
         # Default agent at origin, velocity=0
         p_pos = jnp.array([-1.0, -1.0])
         p_vel = jnp.array([0.0, 0.0])
 
-        barriers = jnp.array([[1.0, 0.0], [-1.0, 0.0]])
+        barriers = jnp.array([[1.0, 0.0], [-1.0, 0.0],[0.,0.],[0.,1.],[0.,-1.],[1.,-1.],[-1.,1.]])[:self.n_barriers,:]
+        # barriers = jax.random.uniform(key, shape=(self.n_barriers, 2), minval=-1.0, maxval=1.0)
 
         done = False
         step = 0
         goal = jnp.array([1.0, 1.0])
-        return SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
+        state=SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
+        obs = self.get_obs(state)
+        return obs, state

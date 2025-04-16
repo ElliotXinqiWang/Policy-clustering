@@ -11,9 +11,7 @@ import optax
 from flax.training.train_state import TrainState
 from flax import serialization
 import wandb
-from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld
-from gridworld.continuous_gridworld import SingleAgentEnv, TwoBarriorEnv
-
+from set_env import set_env
 
 from utils.networks import ActorCriticRNN, ScannedRNN, ContinuousActorCriticRNN
 
@@ -114,22 +112,7 @@ def parse_args_and_update_config(config_class):
 
 
 def get_rollout(config):
-    if config.env == "MiniGrid-Reacher":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=config.epsilon)
-    elif config.env == "MiniGrid-Binary-Reacher":
-        env = FixedGridworld(K=3, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=config.epsilon)
-    elif config.env == "MiniGrid-Reacher-noisy":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=0.5)
-    elif config.env == "MiniGrid-Reacher-extra-good":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-bad":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-med":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
-    elif config.env == "ContGrid-Diaganol":
-        env = SingleAgentEnv(n_barriers=1, max_steps=100, agent_size=0.1, barrier_size=0.1, contact_force=0.1, noise_constant=config.noise_constant)
-    else:
-        raise ValueError("Environment: ", config.env, " not supported")    
+    env = set_env(config)  
 
     # config.action_dim = 5
     config.action_dim = env.action_dim
@@ -377,7 +360,7 @@ if __name__ == "__main__":
         config.disable_jit = True
     wandb.init(
         project=config.project,
-        entity="huhaoo",#!/bin/bash
+        entity="policy-clustering",#!/bin/bash
         group=config.group,
         name=config.name,
         config=config,
@@ -396,6 +379,10 @@ if __name__ == "__main__":
     network_params = best_params
     print("best reward: ", best_reward)
     
+    # if behavior_models/PPO_{config.env} not exists, create it
+    if not os.path.exists(f"behavior_models/PPO_{config.env}"):
+        os.makedirs(f"behavior_models/PPO_{config.env}", exist_ok=True)
+
     # save the best model
     with open(f"behavior_models/PPO_{config.env}/best_params.pkl", "wb") as f:
         f.write(serialization.to_bytes(network_params))
@@ -403,22 +390,7 @@ if __name__ == "__main__":
     
     # render a few episodes
     with jax.disable_jit(config.disable_jit):
-        if config.env == "MiniGrid-Reacher":
-            env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=config.epsilon)
-        elif config.env == "MiniGrid-Binary-Reacher":
-            env = FixedGridworld(K=3, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=config.epsilon)
-        elif config.env == "MiniGrid-Reacher-noisy":
-            env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=0.5)
-        elif config.env == "MiniGrid-Reacher-extra-good":
-            env = ExtraRewardGridworld(grid_size=7, max_steps=20, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=config.extra_reward)
-        elif config.env == "MiniGrid-Reacher-extra-bad":
-            env = ExtraRewardGridworld(grid_size=7, max_steps=20, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
-        elif config.env == "MiniGrid-Reacher-extra-med":
-            env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
-        elif config.env == "ContGrid-Diaganol":
-            env = SingleAgentEnv(n_barriers=1, max_steps=100, agent_size=0.1, barrier_size=0.1, contact_force=0.1, noise_constant=config.noise_constant)
-        else:
-            raise ValueError("Environment: ", config.env, " not supported")
+        env= set_env(config)
         if env.action_type == "discrete":
             network = ActorCriticRNN(action_dim=config.action_dim, config=config)
         else:

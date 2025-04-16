@@ -12,8 +12,7 @@ import optax
 from flax.training.train_state import TrainState
 from flax import serialization
 import wandb
-from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld
-
+from set_env import set_env
 
 from utils.networks import ActorCriticRNN, ScannedRNN
 
@@ -98,20 +97,7 @@ def parse_args_and_update_config(config_class):
 
 
 def get_rollout(config):
-    if config.env == "MiniGrid-Reacher":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Binary-Reacher":
-        env = FixedGridworld(K=3, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Reacher-noisy":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.3, goal_reward=10.0, epsilon=0.5)
-    elif config.env == "MiniGrid-Reacher-extra-good":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-bad":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-med":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
-    else:
-        raise ValueError("Environment: ", config.env, " not supported")    
+    env=set_env(config) 
 
     config.action_dim = 5
     obs_shape = env.observation_shape
