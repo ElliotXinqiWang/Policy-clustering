@@ -175,7 +175,7 @@ def train(config):
         config.state_dim = env.observation_space.shape[0]
         config.action_dim = env.action_space.shape[0]
     else:
-        config.action_dim = 5
+        config.action_dim = env.action_dim
         obs_shape = env.observation_shape
         config.state_dim = obs_shape.prod()
     

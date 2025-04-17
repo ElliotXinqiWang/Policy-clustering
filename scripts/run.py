@@ -26,8 +26,8 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 # runtimes=256
-runtimes=16
-# runtimes=1
+# runtimes=16
+runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
@@ -67,7 +67,8 @@ supervise_sample=100
 # envs=['halfcheetah']
 # envs=['MDPtakeball-hard']
 # envs=['MiniGrid-Reacher-extra-good']
-envs=['MiniGrid-Reacher-MDP']
+# envs=['MiniGrid-Reacher-MDP']
+envs=['Gridworld-reacher-continous']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
@@ -105,6 +106,13 @@ for env_name in envs:
             "datasets/rule_based/MiniGrid-Reacher-extra-good/batch_8000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-extra-bad/batch_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-extra-med/batch_20000.pkl",
+        ]
+        # vqvae_alpha=100
+    elif env_name == "Gridworld-reacher-continous":
+        rule_based_dataset_files=[
+            "datasets/Gridworld-reacher-continous/continous/data_20000_0.pkl",
+            "datasets/Gridworld-reacher-continous-dr/dr/data_20000_0.pkl",
+            "datasets/Gridworld-reacher-continous-lu/lu/data_20000_0.pkl",
         ]
         # vqvae_alpha=100
     else:

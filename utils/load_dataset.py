@@ -25,6 +25,7 @@ from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 
 from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, DEC
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
+from gridworld.continuous_gridworld import SpecifyPathEnv
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 
 # @dataclass
@@ -244,6 +245,8 @@ def load_env(config):
         env = MDPGridworld(max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon)
     elif config.env == "MDPtakeball" or config.env == "MDPtakeball-hard":
         env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target))
+    elif config.env == "Gridworld-reacher-continous":
+        env = SpecifyPathEnv(max_steps=20, path=0)
     else:
         env = gym.make(config.env)
         # raise ValueError("Environment: ", config.env, " not supported") 
