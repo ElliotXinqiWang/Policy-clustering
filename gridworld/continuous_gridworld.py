@@ -223,10 +223,9 @@ class SingleAgentEnv:
 
 class TwoBarriorEnv(SingleAgentEnv):
     def __init__(self, n_barriers: int = 2, **kwargs):
-        assert n_barriers > 0 and n_barriers<=7
         super().__init__(n_barriers=n_barriers, **kwargs)
     
-    def reset(self, key: chex.PRNGKey=None) -> SingleState:
+    def reset(self, key: chex.PRNGKey=None):
         """Reset environment to default initial state."""
         # Default agent at origin, velocity=0
         p_pos = jnp.array([-1.0, -1.0])
@@ -241,3 +240,36 @@ class TwoBarriorEnv(SingleAgentEnv):
         state=SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
         obs = self.get_obs(state)
         return obs, state
+
+class SpecifyPathEnv(SingleAgentEnv):
+    def __init__(self, n_barriers: int = 2, path: int = 0, path_penaty:float=20., **kwargs):
+        assert n_barriers > 0 and n_barriers<=7
+        super().__init__(n_barriers=n_barriers, **kwargs)
+        self.path = path
+        self.path_penaty = path_penaty
+
+    def reset(self, key: chex.PRNGKey=None):
+        """Reset environment to default initial state."""
+        p_pos = jnp.array([-1.0, -1.0])
+        p_vel = jnp.array([0.0, 0.0])
+        barriers = jnp.array([[1.0, 0.0], [-1.0, 0.0],[0.,0.],[0.,1.],[0.,-1.],[1.,-1.],[-1.,1.]])[:self.n_barriers,:]
+        # barriers = jax.random.uniform(key, shape=(self.n_barriers, 2), minval=-1.0, maxval=1.0)
+        done = False
+        step = 0
+        goal = jnp.array([1.0, 1.0])
+        state=SingleState(p_pos=p_pos, p_vel=p_vel, barriers=barriers, done=done, step=step, goal=goal)
+        obs = self.get_obs(state)
+        return obs, state
+    
+    def get_reward(self, state: SingleState, collisions: jnp.ndarray) -> float:
+        basic_reward = super().get_reward(state, collisions)
+        reward= basic_reward
+        if self.path == 0:
+            pass
+        elif self.path == 1:
+            reward -= jnp.minimum(jnp.abs(state.p_pos[0]+1.), jnp.abs(state.p_pos[1]-1.))*self.path_penaty
+        elif self.path == 2:
+            reward -= jnp.minimum(jnp.abs(state.p_pos[0]-1.), jnp.abs(state.p_pos[1]+1.))*self.path_penaty
+        else:
+            raise ValueError("Invalid path specified.")
+        return reward#/self.path_penaty

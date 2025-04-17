@@ -157,10 +157,12 @@ class ContinuousActorCriticRNN(nn.Module):
     @nn.compact
     def __call__(self, hidden, x):
         obs, dones = x
-        embedding = nn.Dense(
-            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )(obs)
-        embedding = nn.relu(embedding)
+        embedding = nn.relu(nn.Dense(
+            128#, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(obs))
+        embedding = nn.relu(nn.Dense(
+            128#, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(obs))
         
         rnn_in = (embedding, dones)
         hidden, rnn_out = ScannedRNN()(hidden, rnn_in)
@@ -170,20 +172,20 @@ class ContinuousActorCriticRNN(nn.Module):
         )
         embedding = nn.relu(embedding)
         actor_mean = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+            self.action_dim#, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(embedding)
         actor_std = nn.Dense(
-            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+            self.action_dim#, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
         )(embedding)
         actor_std = jax.nn.softplus(actor_std) + 1e-5
         
         pi = distrax.MultivariateNormalDiag(loc=actor_mean, scale_diag=actor_std)
         
         
-        critic = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
-            rnn_out
-        )
-        critic = nn.relu(critic)
+        critic = nn.relu(nn.Dense(128#, kernel_init=orthogonal(2), bias_init=constant(0.0)
+                                  )(rnn_out))
+        critic = nn.relu(nn.Dense(128#, kernel_init=orthogonal(2), bias_init=constant(0.0)
+                                  )(rnn_out))
         critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
             critic
         )

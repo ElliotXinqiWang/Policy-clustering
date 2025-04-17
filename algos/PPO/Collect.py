@@ -14,7 +14,7 @@ from flax import serialization
 import wandb
 from set_env import set_env
 
-from utils.networks import ActorCriticRNN, ScannedRNN
+from utils.networks import ActorCriticRNN, ScannedRNN, ContinuousActorCriticRNN
 
 class Transitions(NamedTuple):
     obs: jnp.ndarray = field(default_factory=lambda: jnp.empty((0,)))
@@ -99,17 +99,20 @@ def parse_args_and_update_config(config_class):
 def get_rollout(config):
     env=set_env(config) 
 
-    config.action_dim = 5
+    config.action_dim = env.action_dim
     obs_shape = env.observation_shape
     config.observation_dim = obs_shape.prod()
     
     def rollout_fn(rng):
         # Initialize networks
         rng, init_rng = jax.random.split(rng)
-        actor_critic = ActorCriticRNN(action_dim=config.action_dim, config=config)
-        init_x = jnp.zeros((2, 1, config.observation_dim))
-        ac_init_in = (init_x, jnp.zeros((2, 1)))
-        init_hidden = ScannedRNN.initialize_carry(2, 128)
+        if env.action_type == "discrete":
+            actor_critic = ActorCriticRNN(action_dim=config.action_dim, config=config)
+        else:
+            actor_critic = ContinuousActorCriticRNN(action_dim=config.action_dim, config=config)
+        init_x = jnp.zeros((config.num_envs, 1, config.observation_dim))
+        ac_init_in = (init_x, jnp.zeros((config.num_envs, 1)))
+        init_hidden = ScannedRNN.initialize_carry(config.num_envs, 128)
         network_params = actor_critic.init(init_rng, init_hidden, ac_init_in)
         
         # load network
@@ -176,7 +179,7 @@ def get_rollout(config):
                     }
                 )
                 model_name = config.model_load_path.split("/")[-2].split("-")[-1]
-                save_path = f"datasets/{config.env}/{model_name}/data_{update_steps}.pkl"
+                save_path = f"datasets/{config.env}/{model_name}/data_{config.num_steps}_{update_steps}.pkl"
                 if not os.path.exists(os.path.dirname(save_path)):
                     os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 with open(save_path, "wb") as f:
