@@ -7,11 +7,12 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-algo="vqvae_modify"
+# algo="vqvae_modify"
 # algo="vqvae_modify_few_sample"
 # algo="vqvae_modify_self_train"
 # algo="vqvae"
 # algo="DEC"
+algo="SORL"
 # project="vae_v1.24"
 if algo=="DEC":
     origin_path="algos/DEC.py"
@@ -19,6 +20,8 @@ elif algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
     origin_path="algos/VAE_few_sample.py"
 elif algo=="vqvae_modify":
     origin_path="algos/VAE_kmeans.py"
+elif algo=="SORL":
+    origin_path="algos/SORL.py"
 else:
     raise Exception("Unknown algo")
 copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
@@ -31,7 +34,7 @@ runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
-vae_kl_weight=0.25
+vae_kl_weight=0#.25
 codebook=-1
 # max_updates=10
 # max_updates=200
@@ -42,12 +45,13 @@ learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.3a"
+project="vqvae_v1.3b"
 batch_size=512
 vqvae_modify_use_sigma=False
 vqvae_modify_sum_method="sum"
 encoder_attention_pre_process="rnn"
 encoder_attention_pre_process_layers=1
+true_k_available=True
 
 lr_decay="none"
 # lr_decay="warmup-cos"
@@ -63,28 +67,35 @@ supervise_sample=100
 # print(supervise_samples)
 # exit(0)
 
-# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah']
+# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah','Gridworld-reacher-continous']
 # envs=['halfcheetah']
 # envs=['MDPtakeball-hard']
+envs=['MDPtakeball']
 # envs=['MiniGrid-Reacher-extra-good']
 # envs=['MiniGrid-Reacher-MDP']
-envs=['Gridworld-reacher-continous']
+# envs=['Gridworld-reacher-continous']
 
 # env_name="MiniGrid-Reacher-MDP"
 # env_name="MDPtakeball"
 # env_name="MiniGrid-Reacher-extra-good"
 # env_name="halfcheetah"
 
+if algo=="SORL":
+    encoder_attention=False
+    batch_size=1024
+    true_k_available=False
+    k_value=6
+
 # for supervise_sample in supervise_samples:
 for env_name in envs:
     if env_name == "MiniGrid-Reacher-MDP":
         rule_based_dataset_files=[
             "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/random2_20000.pkl"
         ]
     elif env_name == "MDPtakeball":
@@ -182,6 +193,9 @@ for env_name in envs:
             command+=f"--vae_kl_weight {vae_kl_weight} "
         if algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
             command+=f"--supervise_sample {supervise_sample} "
+        if not true_k_available:
+            command+=f"--true_k_available False "
+            command+=f"--k_value {k_value} "
         command+=f"--batch_size {batch_size} "
         print(command)
         os.system(command)

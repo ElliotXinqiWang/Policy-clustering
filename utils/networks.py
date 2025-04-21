@@ -255,7 +255,7 @@ class Encoder_rnn_attention(nn.Module):
     @nn.compact
     def __call__(self, x, act):
         obs, done = x  # obs: (seq_len, batch_size, obs_dim), dones: (seq_len, batch_size), act: (seq_len, batch_size) or (seq_len, batch_size, act_dim)
-        print("act shape", act.shape)
+        # print("act shape", act.shape)
         act=act.reshape(act.shape[0],act.shape[1],-1)
         done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)
         seq_len = obs.shape[0]
@@ -263,15 +263,14 @@ class Encoder_rnn_attention(nn.Module):
 
         # Embedding layer
         embedding_obs = obs
-        embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
-        # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
         embedding_act = act
-        print("act shape", embedding_act.shape)
         embedding_act = nn.relu(nn.Dense(32)(embedding_act))
-        embedding_act = nn.relu(nn.Dense(128)(embedding_act))
+        # embedding_act = nn.relu(nn.Dense(128)(embedding_act))
         embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
         # embedding = embedding_obs
-        embedding = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding))
+        embedding = nn.relu(nn.Dense(128)(embedding))
 
         hidden = ScannedRNN.initialize_carry(batch_size, self.hidden_dim)
         rnn_in = (embedding, done)
@@ -284,7 +283,6 @@ class Encoder_rnn_attention(nn.Module):
 
         K = K.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, qk_dim)
         V = V.transpose((1, 2, 0, 3))  # (batch_size, heads, seq_len, latent_dim)
-        print("shape", K.shape, self.Q.shape)
         A = (self.Q[None,:,None,:] * K).sum(axis=-1) / jnp.sqrt(self.qk_dim) # (batch_size, heads, seq_len)
         # jax.debug.print("A {}, d {}", A.shape, done_mask.shape)
         A = A * done_mask.transpose((1,0))[:, None, :]
@@ -742,6 +740,42 @@ class DEC(nn.Module):
         q = self.cluster_layer(z)
         x_hat = self.decoder(z, x)
         return x_hat, q, z
+
+class LoRA_mod(nn.Module):
+    # d: int # input dim
+    r: int # hidden dim
+    k: int # output dim
+    m: int # number of policies
+
+    @nn.compact
+    def __call__(self, x, id): # x: (seq_len, batch_size, d), id: (batch_size, m) => (seq_len, batch_size, k)
+        y=nn.Dense(self.r*self.m)(x).reshape(x.shape[0],x.shape[1],self.m,self.r) # (seq_len, batch_size, m, r)
+        y=nn.Dense(self.k)(y) # (seq_len, batch_size, m, k)
+        y=jnp.sum(y*id[None,:,:,None],axis=-2) # (seq_len, batch_size, k)
+        return nn.Dense(self.k)(x) + y
+
+class MLP_3_LoRA(nn.Module):
+    # d: int # input dim
+    r: int # hidden dim
+    k: int # output dim = action dim
+    l: int # latent layer dim
+    m: int # number of policies
+
+    discrete_policy: bool = False
+
+    @nn.compact
+    def __call__(self, x, id): # x: (seq_len, batch_size, d), id: (batch_size, m) => (seq_len, batch_size, k)
+        x=jnp.concatenate([x, jnp.broadcast_to(id[None,:,:], (x.shape[0], x.shape[1], id.shape[1]))], axis=-1)
+        x=nn.relu(LoRA_mod(self.r, self.l, self.m)(x, id))
+        x=nn.relu(LoRA_mod(self.r, self.l, self.m)(x, id))
+        if self.discrete_policy:
+            x=nn.softmax(LoRA_mod(self.r, self.l, self.m)(x, id))
+            pi=distrax.Categorical(logits=x)
+        else:
+            mu=LoRA_mod(self.r, self.l, self.m)(x, id)
+            std=nn.softplus(LoRA_mod(self.r, self.l, self.m)(x, id))+1e-5
+            pi=distrax.MultivariateNormalDiag(loc=mu, scale_diag=std)
+        return pi
 
 # class EncoderA(nn.Module):
 #     latent_dim: int  # Latent space dimension

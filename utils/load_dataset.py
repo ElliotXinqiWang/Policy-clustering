@@ -150,7 +150,7 @@ def load_datasets(config):
         print("Sliced dataset saved to ", "datasets/" + config.env + "/converted.pkl")
     return dataset, data_idx
 
-def load(config):
+def load(config, dropout=0):
         
     # load dataset from local if exists
     dataset_filename = config.env + "/" + "|".join([str(size) for size in config.dataset_sizes]) + ".pkl"
@@ -226,6 +226,15 @@ def load(config):
     # set the last done to be True if the episode is not done
     dataset = dataset._replace(done=jnp.concatenate([jnp.zeros_like(dataset.done[:, -1:]), dataset.done[:, :-1]], axis=1))
     dataset = dataset._replace(done=jnp.concatenate([dataset.done[:, :-1], jnp.ones_like(dataset.done[:, -1:])], axis=1))
+    if dropout > 0:
+        idx=np.random.choice(dataset.obs.shape[0], int(dataset.obs.shape[0] * (1-dropout)), replace=False)
+        dataset = dataset._replace(
+            obs=dataset.obs[idx],
+            action=dataset.action[idx],
+            reward=dataset.reward[idx],
+            done=dataset.done[idx],
+        )
+        data_idx = data_idx[idx]
     return dataset, data_idx
 
 def load_env(config):
