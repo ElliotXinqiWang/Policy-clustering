@@ -263,14 +263,20 @@ class Encoder_rnn_attention(nn.Module):
 
         # Embedding layer
         embedding_obs = obs
-        embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
-        embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        embedding_obs = nn.relu(nn.Dense(128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(embedding_obs))
+        # embedding_obs = nn.relu(nn.Dense(128)(embedding_obs))
+        
         embedding_act = act
         embedding_act = nn.relu(nn.Dense(32)(embedding_act))
-        # embedding_act = nn.relu(nn.Dense(128)(embedding_act))
+        embedding_act = nn.relu(nn.Dense(128)(embedding_act))
+
         embedding = jnp.concatenate([embedding_obs, embedding_act], axis=-1)
         # embedding = embedding_obs
-        embedding = nn.relu(nn.Dense(128)(embedding))
+        embedding = nn.Dense(
+            128, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(embedding)
+        embedding = nn.relu(embedding)
+
 
         hidden = ScannedRNN.initialize_carry(batch_size, self.hidden_dim)
         rnn_in = (embedding, done)
@@ -769,11 +775,11 @@ class MLP_3_LoRA(nn.Module):
         x=nn.relu(LoRA_mod(self.r, self.l, self.m)(x, id))
         x=nn.relu(LoRA_mod(self.r, self.l, self.m)(x, id))
         if self.discrete_policy:
-            x=nn.softmax(LoRA_mod(self.r, self.l, self.m)(x, id))
+            x=nn.softmax(LoRA_mod(self.r, self.k, self.m)(x, id))
             pi=distrax.Categorical(logits=x)
         else:
-            mu=LoRA_mod(self.r, self.l, self.m)(x, id)
-            std=nn.softplus(LoRA_mod(self.r, self.l, self.m)(x, id))+1e-5
+            mu=LoRA_mod(self.r, self.k, self.m)(x, id)
+            std=nn.softplus(LoRA_mod(self.r, self.k, self.m)(x, id))+1e-5
             pi=distrax.MultivariateNormalDiag(loc=mu, scale_diag=std)
         return pi
 

@@ -155,7 +155,7 @@ def train(config):
     
     print(f"State dim: {config.state_dim}, Action dim: {config.action_dim}")
     
-    dataset, data_idx = load(config,0.5)
+    dataset, data_idx = load(config,0.25)
     
     if config.true_k_available:
         true_k = int(jnp.max(data_idx)) + 1

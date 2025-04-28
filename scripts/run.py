@@ -7,18 +7,18 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-# algo="vqvae_modify"
+algo="vqvae_modify"
 # algo="vqvae_modify_few_sample"
 # algo="vqvae_modify_self_train"
 # algo="vqvae"
 # algo="DEC"
-algo="SORL"
+# algo="SORL"
 # project="vae_v1.24"
 if algo=="DEC":
     origin_path="algos/DEC.py"
 elif algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
     origin_path="algos/VAE_few_sample.py"
-elif algo=="vqvae_modify":
+elif algo=="vqvae_modify" or algo=="vqvae":
     origin_path="algos/VAE_kmeans.py"
 elif algo=="SORL":
     origin_path="algos/SORL.py"
@@ -29,8 +29,8 @@ copy_path=f"VAE_kmeans_runtimecopy{random.randint(0,2**30-1)}.py"
 os.system(f"cp {origin_path} {copy_path}")
 
 # runtimes=256
-# runtimes=16
-runtimes=1
+runtimes=16
+# runtimes=1
 
 vqvae_alpha=1
 vqvae_beta=1
@@ -38,17 +38,18 @@ vae_kl_weight=0#.25
 codebook=-1
 # max_updates=10
 # max_updates=200
-max_updates=800
+max_updates=1000
 load_from_rule_based_dataset=True
-encoder_attention=True
+encoder_attention=False
 learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
 encoder_heads=2
-project="vqvae_v1.3b"
+project="vqvae_v1.3c"
+# project="LORA_v1"
 batch_size=512
 vqvae_modify_use_sigma=False
-vqvae_modify_sum_method="sum"
+vqvae_modify_sum_method="max"
 encoder_attention_pre_process="rnn"
 encoder_attention_pre_process_layers=1
 true_k_available=True
@@ -67,10 +68,11 @@ supervise_sample=100
 # print(supervise_samples)
 # exit(0)
 
-# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah','Gridworld-reacher-continous']
+envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah','Gridworld-reacher-continous']
+# envs=['MiniGrid-Reacher-MDP','MDPtakeball','Gridworld-reacher-continous']
 # envs=['halfcheetah']
 # envs=['MDPtakeball-hard']
-envs=['MDPtakeball']
+# envs=['MDPtakeball']
 # envs=['MiniGrid-Reacher-extra-good']
 # envs=['MiniGrid-Reacher-MDP']
 # envs=['Gridworld-reacher-continous']
@@ -88,14 +90,15 @@ if algo=="SORL":
 
 # for supervise_sample in supervise_samples:
 for env_name in envs:
+    load_from_rule_based_dataset=True
     if env_name == "MiniGrid-Reacher-MDP":
         rule_based_dataset_files=[
             "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl",
             # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
             # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl",
-            # "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
-            # "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/random2_20000.pkl"
         ]
     elif env_name == "MDPtakeball":
@@ -125,7 +128,7 @@ for env_name in envs:
             "datasets/Gridworld-reacher-continous-dr/dr/data_20000_0.pkl",
             "datasets/Gridworld-reacher-continous-lu/lu/data_20000_0.pkl",
         ]
-        # vqvae_alpha=100
+        max_updates=500
     else:
         dataset="medium-expert"
         # dataset="medium-replay"

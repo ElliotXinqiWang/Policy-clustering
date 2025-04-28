@@ -89,6 +89,7 @@ class SingleAgentEnv:
         """Apply action as a force, update velocity and position, compute collisions, and optionally reset."""
         # Hyperparameters for acceleration and friction
         force_scale = 0.1
+        # force_scale = 0.02
         friction = 0.99
 
         # Vectorized collision check with barriers using vmap
@@ -242,7 +243,7 @@ class TwoBarriorEnv(SingleAgentEnv):
         return obs, state
 
 class SpecifyPathEnv(SingleAgentEnv):
-    def __init__(self, n_barriers: int = 2, path: int = 0, path_penaty:float=20., **kwargs):
+    def __init__(self, n_barriers: int = 2, path: int = 0, path_penaty:float=5., **kwargs):
         assert n_barriers > 0 and n_barriers<=7
         super().__init__(n_barriers=n_barriers, **kwargs)
         self.path = path
@@ -250,9 +251,9 @@ class SpecifyPathEnv(SingleAgentEnv):
 
     def reset(self, key: chex.PRNGKey=None):
         """Reset environment to default initial state."""
-        p_pos = jnp.array([-1.0, -1.0])
+        p_pos = jnp.array([-1.0, -1.0])+ jax.random.uniform(key, shape=(2,), minval=-1, maxval=1)*0.2
         p_vel = jnp.array([0.0, 0.0])
-        barriers = jnp.array([[1.0, 0.0], [-1.0, 0.0],[0.,0.],[0.,1.],[0.,-1.],[1.,-1.],[-1.,1.]])[:self.n_barriers,:]
+        barriers = jnp.array([[1.0, 0.0], [-1.0, 0.0],[0.,0.],[0.,1.],[0.,-1.],[1.,-1.],[-1.,1.]])[:self.n_barriers,:]*10
         # barriers = jax.random.uniform(key, shape=(self.n_barriers, 2), minval=-1.0, maxval=1.0)
         done = False
         step = 0

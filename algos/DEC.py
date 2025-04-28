@@ -71,7 +71,7 @@ class TrainConfig:
     learning_rate: float = 1e-3
     adam_eps: float = 1e-8
     # Kmeans
-    K_value: int = 5 # Number of clusters
+    k_value: int = 5 # Number of clusters
     max_traj_len: int = 20  # Max trajectory length
     normalize: bool = True  # Normalize states
     # vae
@@ -92,7 +92,7 @@ class TrainConfig:
 
     def __post_init__(self):
         # self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
-        self.name = f"{self.name}-{self.env}-{self.K_value}"
+        self.name = f"{self.name}-{self.env}-{self.k_value}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
             
@@ -142,32 +142,15 @@ def train(config):
     # Set random seed
     rng = jax.random.PRNGKey(config.seed)
     np.random.seed(config.seed)
-    if config.env == "MiniGrid-Reacher":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Binary-Reacher":
-        env = FixedGridworld(K=3, max_steps=20, distance_penalty=-0.5, goal_reward=10.0)
-    elif config.env == "MiniGrid-Reacher-noisy":
-        env = SingleAgentGridworld(grid_size=7, max_steps=20, distance_penalty=-0.5, goal_reward=10.0, epsilon=0.5)
-    elif config.env == "MiniGrid-Reacher-extra-good":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-bad":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=-config.extra_reward)
-    elif config.env == "MiniGrid-Reacher-extra-med":
-        env = ExtraRewardGridworld(grid_size=7, max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon, extra_reward=0)
-    elif config.env == "MiniGrid-Reacher-MDP":
-        env = MDPGridworld(max_steps=40, distance_penalty=-0.3, goal_reward=10.0, epsilon=config.epsilon)
-    elif config.env == "MDPtakeball":
-        env = MDPtakeball(max_steps=40, distance_penalty=-0.0, goal_reward=10.0, epsilon=config.epsilon, target_ball=int(config.take_ball_target))
-    else:
-        env = gym.make(config.env)
-        # raise ValueError("Environment: ", config.env, " not supported") 
+    from utils.load_dataset import load_env
+    env = load_env(config)
     D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2"]
     
     if config.env in D4RL_envs:
         config.state_dim = env.observation_space.shape[0]
         config.action_dim = env.action_space.shape[0]
     else:
-        config.action_dim = 5
+        config.action_dim = env.action_dim
         obs_shape = env.observation_shape
         config.state_dim = obs_shape.prod()
     
@@ -195,7 +178,7 @@ def train(config):
         print("medium average returns: ", jnp.mean(returns[:expert_start_idx]), "num of medium trajs: ", expert_start_idx)
         print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
         data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP", "MiniGrid-Reacher-extra-good"]:
+    elif config.env in ["MDPtakeball", "MiniGrid-Reacher-MDP", "MiniGrid-Reacher-extra-good","Gridworld-reacher-continous"]:
         dataset, data_idx = load_rule_based_datasets(config)
     elif not os.path.exists("datasets/" + dataset_filename):
         dataset, data_idx = load_datasets(config)
@@ -235,13 +218,17 @@ def train(config):
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
         
+    if config.true_k_available:
+        true_k = int(jnp.max(data_idx)) + 1
+        config.k_value = true_k
 
     # Initialize model and optimizer
     True_k_value = int(jnp.max(data_idx)) + 1
-    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=(config.env not in D4RL_envs), attention=config.encoder_attention, encoder_heads=config.encoder_heads, Encoder_hidden_dim=config.encoder_hidden_dim, qk_dim=config.qk_dim)
+    discrete_action= (config.env not in D4RL_envs and config.env!="Gridworld-reacher-continous")
+    model=DEC(latent_dim=config.vae_latent_dim, n_clusters=True_k_value, action_dim=config.action_dim,discrete_action=discrete_action, attention=config.encoder_attention, encoder_heads=config.encoder_heads, Encoder_hidden_dim=config.encoder_hidden_dim, qk_dim=config.qk_dim)
     init_x = jnp.zeros((2, 1, config.state_dim))
     ac_init_in = (init_x, jnp.zeros((2, 1)))
-    act_init = jnp.zeros((2, 1, 1)) if not(config.env in D4RL_envs) else jnp.zeros((2, 1, env.action_space.shape[0]))
+    act_init = jnp.zeros((2, 1, 1)) if discrete_action else jnp.zeros((2, 1, env.action_space.shape[0] if config.env in D4RL_envs else env.action_dim))
     rng, init_rng = jax.random.split(rng)
     rng, reparam_rng = jax.random.split(rng)
     network_params = model.init(init_rng, ac_init_in, act_init, reparam_rng)
@@ -327,14 +314,14 @@ def train(config):
     print(f"NMI: {nmi}, ARI: {ari}")
     wandb.log({"NMI": nmi, "ARI": ari})
     
-    dataset_idxs = [jnp.where(predicted_labels == i)[0] for i in range(config.K_value)]
+    dataset_idxs = [jnp.where(predicted_labels == i)[0] for i in range(config.k_value)]
     num_catagories = int(jnp.max(data_idx)) + 1
-    heatmap_matrix = np.zeros((config.K_value, num_catagories))
-    for i in range(config.K_value):
+    heatmap_matrix = np.zeros((config.k_value, num_catagories))
+    for i in range(config.k_value):
         for j in range(num_catagories):
             heatmap_matrix[i, j] = jnp.sum(data_idx[dataset_idxs[i]] == j)
     
-    plot_save_path = f"results/{config.alg}/{config.env}/{config.K_value}/plots"
+    plot_save_path = f"results/{config.alg}/{config.env}/{config.k_value}/plots"
     if not os.path.exists(plot_save_path):
         os.makedirs(plot_save_path)
     dataset_categorical_image = plot_and_save_heatmap(
@@ -371,6 +358,6 @@ if __name__ == "__main__":
     print("rule_based_dataset_files: ", config.rule_based_dataset_files)
     
     print("---------------------------------------")
-    print(f"Training DEC, Env: {config.env}, Seed: {config.seed}, config_k: {config.K_value}")
+    print(f"Training DEC, Env: {config.env}, Seed: {config.seed}, config_k: {config.k_value}")
     print("---------------------------------------")
     train(config)
