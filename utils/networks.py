@@ -34,6 +34,34 @@ class ScannedRNN(nn.Module):
         # Use a dummy key since the default state init fn is just zeros.
         cell = nn.GRUCell(features=hidden_size)
         return cell.initialize_carry(jax.random.PRNGKey(seed), (batch_size, hidden_size))
+    
+class NotScannedRNN(nn.Module):
+    @functools.partial(
+        nn.scan,
+        variable_broadcast="params",
+        in_axes=0,
+        out_axes=0,
+        split_rngs={"params": False},
+    )
+    @nn.compact
+    def __call__(self, carry, x):
+        """Applies the module."""
+        rnn_state = carry
+        ins, resets = x
+        rnn_state = jnp.where(
+            resets[:, np.newaxis],
+            self.initialize_carry(carry.shape[0], carry.shape[1]),
+            rnn_state,
+        )
+        rnn_state = self.initialize_carry(carry.shape[0], carry.shape[1])
+        new_rnn_state, y = nn.GRUCell(features=ins.shape[1])(rnn_state, ins)
+        return new_rnn_state, y
+
+    @staticmethod
+    def initialize_carry(batch_size, hidden_size, seed=0):
+        # Use a dummy key since the default state init fn is just zeros.
+        cell = nn.GRUCell(features=hidden_size)
+        return cell.initialize_carry(jax.random.PRNGKey(seed), (batch_size, hidden_size))
 class DiscreteActorRNN(nn.Module):
     """
     Discrete actor network with RNN.
@@ -41,6 +69,7 @@ class DiscreteActorRNN(nn.Module):
     """
     action_dim: Sequence[int]
     config: Dict
+    not_rnn: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -55,7 +84,10 @@ class DiscreteActorRNN(nn.Module):
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN()(hidden, rnn_in)
+        if self.not_rnn:
+            hidden, embedding = NotScannedRNN()(hidden, rnn_in)
+        else:
+            hidden, embedding = ScannedRNN()(hidden, rnn_in)
 
         actor_mean = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
             embedding
@@ -81,6 +113,7 @@ class ContinuousActorRNN(nn.Module):
     action_dim: int
     hidden_dim: int
     config: Dict
+    not_rnn: bool = False
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -96,7 +129,11 @@ class ContinuousActorRNN(nn.Module):
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
-        hidden, embedding = ScannedRNN()(hidden, rnn_in)
+        print("self.not_rnn", self.not_rnn)
+        if self.not_rnn:
+            hidden, embedding = NotScannedRNN()(hidden, rnn_in)
+        else:
+            hidden, embedding = ScannedRNN()(hidden, rnn_in)
 
         actor_mean = nn.Dense(128, kernel_init=orthogonal(2), bias_init=constant(0.0))(
             embedding
@@ -433,7 +470,7 @@ class VAE(nn.Module):
     action_dim: int
     discrete_action: bool
     
-    attention: bool
+    attention: bool = False
     encoder_heads: int = 4
 
     def setup(self):

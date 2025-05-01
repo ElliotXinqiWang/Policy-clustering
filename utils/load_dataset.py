@@ -189,20 +189,6 @@ def load(config, dropout=0):
             print("expert average returns: ", jnp.mean(returns[expert_start_idx:]), "num of expert trajs: ", len(dataset.obs) - expert_start_idx)
             
             data_idx = jnp.concatenate([jnp.zeros(expert_start_idx), jnp.ones(len(dataset.obs) - expert_start_idx)])
-
-        elif "replay" in config.env:  # 如果是 medium-replay 数据集
-            # 假设"replay"类型数据是通过奖励进行区分的
-            replay_threshold = jnp.percentile(returns, 50)  # 例如通过奖励中位数来区分
-            print("Replay dataset detected. Reward median: ", replay_threshold)
-
-            # 根据奖励值来区分 `medium` 和 `replay`
-            data_idx = jnp.where(returns > replay_threshold, 1, 0)  # 1表示replay, 0表示medium
-
-            print(f"medium trajs: {jnp.sum(data_idx == 0)}, replay trajs: {jnp.sum(data_idx == 1)}")
-
-
-
-
         else:
             raise ValueError("Invalid dataset type. Expected 'medium-expert' or 'medium-replay'.")
 

@@ -7,18 +7,20 @@ os.system("clear")
 gpuid=int(subprocess.run(["python","scripts/select_gpu.py"],stdout=subprocess.PIPE).stdout.decode('utf-8').strip())
 random.seed()
 
-algo="vqvae_modify"
+# algo="vqvae_modify"
 # algo="vqvae_modify_few_sample"
 # algo="vqvae_modify_self_train"
 # algo="vqvae"
+# algo="vqvae"
+# algo="vae"
 # algo="DEC"
-# algo="SORL"
+algo="SORL"
 # project="vae_v1.24"
 if algo=="DEC":
     origin_path="algos/DEC.py"
 elif algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
     origin_path="algos/VAE_few_sample.py"
-elif algo=="vqvae_modify" or algo=="vqvae":
+elif algo=="vqvae_modify" or algo=="vqvae" or algo=='vae':
     origin_path="algos/VAE_kmeans.py"
 elif algo=="SORL":
     origin_path="algos/SORL.py"
@@ -34,13 +36,14 @@ runtimes=16
 
 vqvae_alpha=1
 vqvae_beta=1
-vae_kl_weight=0#.25
+vae_kl_weight=0
+# vae_kl_weight=1
 codebook=-1
 # max_updates=10
 # max_updates=200
 max_updates=1000
 load_from_rule_based_dataset=True
-encoder_attention=False
+encoder_attention=True
 learning_rate=2e-3
 encoder_hidden_dim=8
 qk_dim=1
@@ -68,9 +71,10 @@ supervise_sample=100
 # print(supervise_samples)
 # exit(0)
 
-envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah','Gridworld-reacher-continous']
-# envs=['MiniGrid-Reacher-MDP','MDPtakeball','Gridworld-reacher-continous']
+# envs=['MiniGrid-Reacher-MDP','MDPtakeball','MiniGrid-Reacher-extra-good','halfcheetah','Gridworld-reacher-continous']
+# envs=['MiniGrid-Reacher-MDP','halfcheetah','ant','walker2d','hopper']
 # envs=['halfcheetah']
+envs=['walker2d']
 # envs=['MDPtakeball-hard']
 # envs=['MDPtakeball']
 # envs=['MiniGrid-Reacher-extra-good']
@@ -94,12 +98,12 @@ for env_name in envs:
     if env_name == "MiniGrid-Reacher-MDP":
         rule_based_dataset_files=[
             "datasets/rule_based/MiniGrid-Reacher-MDP/balanced_20000.pkl",
-            # "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
-            # "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/rightfirst_20000.pkl",
+            "datasets/rule_based/MiniGrid-Reacher-MDP/downfirst_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag1_20000.pkl",
             "datasets/rule_based/MiniGrid-Reacher-MDP/zigzag2_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
-            "datasets/rule_based/MiniGrid-Reacher-MDP/random2_20000.pkl"
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/random1_20000.pkl",
+            # "datasets/rule_based/MiniGrid-Reacher-MDP/random2_20000.pkl"
         ]
     elif env_name == "MDPtakeball":
         rule_based_dataset_files=[
