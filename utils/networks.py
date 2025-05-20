@@ -69,7 +69,7 @@ class DiscreteActorRNN(nn.Module):
     """
     action_dim: Sequence[int]
     config: Dict
-    not_rnn: bool = False
+    not_rnn: bool = True
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -113,7 +113,7 @@ class ContinuousActorRNN(nn.Module):
     action_dim: int
     hidden_dim: int
     config: Dict
-    not_rnn: bool = False
+    not_rnn: bool = True
 
     @nn.compact
     def __call__(self, hidden, x):
@@ -129,7 +129,7 @@ class ContinuousActorRNN(nn.Module):
         embedding = nn.relu(embedding)
 
         rnn_in = (embedding, dones)
-        print("self.not_rnn", self.not_rnn)
+        # print("self.not_rnn", self.not_rnn)
         if self.not_rnn:
             hidden, embedding = NotScannedRNN()(hidden, rnn_in)
         else:
@@ -619,7 +619,7 @@ class VQVAE_modify(nn.Module):
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode
         z, loss = self.reparameterize(mu)  # Reparameterization
-        print(mu.shape,z.shape)
+        # print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
         return pi, z, loss
     
@@ -670,6 +670,7 @@ class VQVAE_modify_few_sample(nn.Module):
         #     self.sigma = self.param('sigma', init_param, (self.k, self.latent_dim,self.latent_dim))
         # else:
         #     self.sigma = jnp.tile(jnp.eye(self.latent_dim)[None,:,:],(self.k,1,1))
+        self.ln=nn.LayerNorm()
         
     def log_pdf(self, x, mu): # return (batch_size, k)
         x=x[:,None,:]-mu[None,:,:]
@@ -687,6 +688,7 @@ class VQVAE_modify_few_sample(nn.Module):
 
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode
+        mu=self.ln(mu)
         z, mat, sloss = self.calc(mu)  # Reparameterization
         # print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode

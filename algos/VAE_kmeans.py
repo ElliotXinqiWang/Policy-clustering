@@ -54,7 +54,7 @@ class TrainConfig:
     checkpoints_path: Optional[str] = None  # Save path
     batch_size: int = 64  # Batch size for all networks
     load_from_rule_based_dataset: bool = True
-    true_k_available: bool = True
+    true_k_available: bool = False
     dataset_paths: list[str] = field(default_factory=lambda: [
         "datasets/MiniGrid-Reacher-extra-med/good",
         "datasets/MiniGrid-Reacher-extra-med/bad",
@@ -186,6 +186,8 @@ def train(config):
     if config.true_k_available:
         true_k = int(jnp.max(data_idx)) + 1
         config.k_value = true_k
+    else:
+        true_k = config.k_value
     print("Run on config: ", config)
     
     # filter out episodes with short length, which can be easily learned by the network

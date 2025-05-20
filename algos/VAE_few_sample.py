@@ -83,7 +83,7 @@ class TrainConfig:
     normalize: bool = True  # Normalize states
     # vae
     vae_latent_dim: int = 32
-    vae_kl_weight: float = 0.5
+    vae_kl_weight: float = 0
     # Wandb logging
     project: str = "1017VAEKmeans"
     group: str = "PKmeans"
@@ -296,7 +296,7 @@ def train(config):
                 loss=-mat[jnp.arange(mat.shape[0]),id].mean()*config.vqvae_alpha
                 recon_loss = -pi.log_prob(action)
                 recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
-                return loss + recon_loss - sloss
+                return loss + recon_loss - sloss*config.vae_kl_weight
             grad_fn = jax.value_and_grad(loss_fn)
             rng, vae_rng = jax.random.split(rng)
             loss, grad = grad_fn(train_state.params, batch, vae_rng)
@@ -320,7 +320,7 @@ def train(config):
                     train_state, _ = epoch_step((train_state, dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx], update_rng), i, method=config.algo)
                     err = error_rate(train_state.params, (dataset.obs[super_idx], dataset.action[super_idx], dataset.reward[super_idx], dataset.done[super_idx], obs_idx[super_idx]))
                     # print("Loss: ", _, "Error rate: ", err)
-                    if err < 0.1 or it>10:
+                    if err < 0.1 or it>20:
                         break
             train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, obs_idx, update_rng), i, method=config.algo)
             if config.supervise_sample:
@@ -330,7 +330,7 @@ def train(config):
             loss_history.append(loss)
             print(f"Update {i}, Loss: {loss}, Error: {err}")
             wandb.log({"Loss": loss, "Error": err})
-            if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4:
+            if len(loss_history) > 10 and (jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4 or err>0.1):
                 break
         print("Training finished after ", i, " updates")
     elif config.algo=="vqvae_modify_self_train":

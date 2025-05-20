@@ -49,6 +49,7 @@ class TrainConfig:
     batch_size: int = 2048  # Batch size for all networks
     load_from_rule_based_dataset: bool = True
     true_k_available: bool = True
+    use_rnn: bool = False
     dataset_paths: list[str] = field(default_factory=lambda: [
         "datasets/MiniGrid-Reacher-extra-med/good",
         "datasets/MiniGrid-Reacher-extra-med/bad",
@@ -351,7 +352,7 @@ def train(config):
     #         dataset_idxs.append(jnp.where(data_idx == i)[0])
     # Initialize K networks and create training states
     train_states = []
-    model = DiscreteActorRNN(config.action_dim, config)
+    model = DiscreteActorRNN(config.action_dim, config, not_rnn=not config.use_rnn)
     tx = optax.chain(
             optax.clip_by_global_norm(config.max_grad_norm),
             optax.adam(learning_rate=config.learning_rate, eps=config.adam_eps),

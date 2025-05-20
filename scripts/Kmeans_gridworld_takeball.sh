@@ -14,9 +14,9 @@ env_name="MDPtakeball"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-# seeds=(0 1 2 3 4 5 6 7 8 9)
+seeds=(0 1 2 3 4 5 6 7 8 9)
 # Kvalues=(4 5 6 7 8 10 12 15)
-seeds=(0)
+# seeds=(0)
 Kvalues=(5) # for debugging
 rule_based_dataset_files=(
     # "datasets/rule_based/MDPtakeball/0_20000.pkl"
@@ -28,7 +28,7 @@ rule_based_dataset_files=(
     "datasets/rule_based/MDPtakeball/fixed_2_20000.pkl"
     "datasets/rule_based/MDPtakeball/fixed_3_20000.pkl"
 )
-SELECTED_GPU=$(python select_gpu.py)
+SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"
 for seed in "${seeds[@]}"; do
     for k in "${Kvalues[@]}"; do
@@ -37,7 +37,7 @@ for seed in "${seeds[@]}"; do
             --env "$env_name" \
             --K_value "$k" \
             --seed "$seed" \
-            --project "0124Kmeans_fixed_takeball_rule_based_small" \
+            --project "test_pgkmeans" \
             --max_updates 15 \
             --load_from_rule_based_dataset true \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}"

@@ -13,9 +13,9 @@ env_name="MiniGrid-Reacher-MDP"
 # dataset="full-replay"
 # dataset="medium"
 # dataset="random"
-# seeds=(0 1 2 3 4 5 6 7 8 9)
+seeds=(0 1 2 3 4 5 6 7 8 9)
 # Kvalues=(5 6 7 8 10 12 15)
-seeds=(0)
+# seeds=(0)
 Kvalues=(5)
 # Kvalues=(8) # for debugging
 rule_based_dataset_files=(
@@ -45,7 +45,7 @@ for seed in "${seeds[@]}"; do
             --K_value "$k" \
             --seed "$seed" \
             --project "Kmeans_girdworld" \
-            --max_updates 15 \
+            --max_updates 30 \
             --load_from_rule_based_dataset true \
             --rule_based_dataset_files "${rule_based_dataset_files[@]}" \
             # --learning_rate 0.01 

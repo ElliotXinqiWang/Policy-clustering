@@ -762,39 +762,39 @@ def train(config):
         )
         wandb.log({"final_dataset_size": wandb.Image(final_dataset_size_image)})
         
-        average_returns_image = plot_and_save_bar(
-            data=plot_data["average_returns"],
-            title="Average Returns",
-            xlabel="Dataset Index",
-            ylabel="Normalized Returns",
-            categories=[f"{i}" for i in range(config.K_value)],
-            save_path=os.path.join(plot_save_path, "average_returns.png"),
-            stds=plot_data["return_stds"],
-            ymin=-10,
-            ymax=120
-        )
+        # average_returns_image = plot_and_save_bar(
+        #     data=plot_data["average_returns"],
+        #     title="Average Returns",
+        #     xlabel="Dataset Index",
+        #     ylabel="Normalized Returns",
+        #     categories=[f"{i}" for i in range(config.K_value)],
+        #     save_path=os.path.join(plot_save_path, "average_returns.png"),
+        #     stds=plot_data["return_stds"],
+        #     ymin=-10,
+        #     ymax=120
+        # )
         # wandb.log({"average_returns": wandb.Image(average_returns_image)})
         
-        dataset_averages_image = plot_and_save_bar(
-            data=plot_data["dataset_averages"],
-            title="Average Returns of Datasets",
-            xlabel="Dataset Index",
-            ylabel="Normalized Returns",
-            categories=[f"{i}" for i in range(config.K_value)],
-            save_path=os.path.join(plot_save_path, "dataset_averages.png"),
-            ymin=-10,
-            ymax=120
-        )
+        # dataset_averages_image = plot_and_save_bar(
+        #     data=plot_data["dataset_averages"],
+        #     title="Average Returns of Datasets",
+        #     xlabel="Dataset Index",
+        #     ylabel="Normalized Returns",
+        #     categories=[f"{i}" for i in range(config.K_value)],
+        #     save_path=os.path.join(plot_save_path, "dataset_averages.png"),
+        #     ymin=-10,
+        #     ymax=120
+        # )
         # wandb.log({"normalized_dataset_averages": wandb.Image(dataset_averages_image)})
         
-        dataset_stds_image = plot_and_save_bar(
-            data=plot_data["dataset_stds"],
-            title="Std Returns of Datasets",
-            xlabel="Dataset Index",
-            ylabel="Normalized Returns",
-            categories=[f"{i}" for i in range(config.K_value)],
-            save_path=os.path.join(plot_save_path, "dataset_stds.png")
-        )
+        # dataset_stds_image = plot_and_save_bar(
+        #     data=plot_data["dataset_stds"],
+        #     title="Std Returns of Datasets",
+        #     xlabel="Dataset Index",
+        #     ylabel="Normalized Returns",
+        #     categories=[f"{i}" for i in range(config.K_value)],
+        #     save_path=os.path.join(plot_save_path, "dataset_stds.png")
+        # )
         # wandb.log({"dataset_stds": wandb.Image(dataset_stds_image)})
         
         dataset_categorical_image = plot_and_save_heatmap(
