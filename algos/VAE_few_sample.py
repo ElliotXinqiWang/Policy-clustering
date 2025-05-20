@@ -32,7 +32,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import VQVAE_modify_few_sample
+from utils.networks import CAAE_few_sample
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 from utils.load_dataset import Transitions, load, load_env
@@ -100,8 +100,8 @@ class TrainConfig:
     encoder_attention_pre_process: str = "rnn"
     encoder_attention_pre_process_layers: int = 1
 
-    vqvae_modify_use_sigma: bool = False
-    # vqvae_modify_sum_method: str = "sum"
+    CAAE_use_sigma: bool = False
+    # CAAE_sum_method: str = "sum"
 
     take_ball_target: int = 0
 
@@ -206,12 +206,12 @@ def train(config):
     print("Dataset shape: obs ", dataset.obs.shape, " action ", dataset.action.shape, " reward ", dataset.reward.shape, " done ", dataset.done.shape)
     
     DiscreteEnvNames = ["MiniGrid-Reacher", "MiniGrid-Binary-Reacher", "MiniGrid-Reacher-noisy", "MiniGrid-Reacher-extra-good", "MiniGrid-Reacher-extra-bad", "MiniGrid-Reacher-extra-med", "MiniGrid-Reacher-MDP", "MDPtakeball", "MDPtakeball-hard"]
-    if config.algo == "vqvae_modify_few_sample" or config.algo == "vqvae_modify_self_train":
-        vae = VQVAE_modify_few_sample(
+    if config.algo == "CAAE_few_sample" or config.algo == "CAAE_self_train":
+        vae = CAAE_few_sample(
             latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha,
             discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
             attention=config.encoder_attention, encoder_heads=config.encoder_heads,
-            use_sigma=config.vqvae_modify_use_sigma, 
+            use_sigma=config.CAAE_use_sigma, 
             pre_process=config.encoder_attention_pre_process, pre_process_layers=config.encoder_attention_pre_process_layers)
     else:
         raise ValueError("Unknown algo: ", config.algo)
@@ -307,7 +307,7 @@ def train(config):
         return train_state, loss.mean()
     epoch_step=jax.jit(epoch_step_func, static_argnames=('method'))
 
-    if config.algo=="vqvae_modify_few_sample":
+    if config.algo=="CAAE_few_sample":
         loss_history = []
         for i in range(config.max_updates):
             rng, update_rng = jax.random.split(rng)
@@ -333,7 +333,7 @@ def train(config):
             if len(loss_history) > 10 and (jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-4 or err>0.1):
                 break
         print("Training finished after ", i, " updates")
-    elif config.algo=="vqvae_modify_self_train":
+    elif config.algo=="CAAE_self_train":
         fix_idx=super_idx
         _it=0
         while len(fix_idx)<len(data_idx) and _it<2:

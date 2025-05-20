@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,VQVAE_modify, MLP_3_LoRA
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,CAAE, MLP_3_LoRA
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 from utils.load_dataset import Transitions, load, load_env

@@ -31,7 +31,7 @@ import wandb
 import h5py
 import matplotlib.pyplot as plt
 
-from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,VQVAE_modify
+from utils.networks import ScannedRNN, ContinuousActorRNN, DiscreteActorRNN, VAE, EncoderWrapper,VQVAE,VQVAE_gumble_softmax,CAAE
 from gridworld.env import SingleAgentGridworld, FixedGridworld, ExtraRewardGridworld, MDPGridworld, MDPtakeball
 from utils.plot_tools import plot_and_save_curves, plot_and_save_bar, plot_and_save_bars, plot_and_save_heatmap
 from utils.load_dataset import Transitions, load, load_env
@@ -110,8 +110,8 @@ class TrainConfig:
     encoder_attention_pre_process: str = "rnn"
     encoder_attention_pre_process_layers: int = 1
 
-    vqvae_modify_use_sigma: bool = False
-    vqvae_modify_sum_method: str = "sum"
+    CAAE_use_sigma: bool = False
+    CAAE_sum_method: str = "sum"
 
     take_ball_target: int = 0
 
@@ -226,11 +226,11 @@ def train(config):
         vae = VQVAE_gumble_softmax(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim,
                                    discrete_policy=(config.env in DiscreteEnvNames), alpha=config.vqvae_alpha, beta=config.vqvae_beta,
                                    k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook)    
-    elif config.algo == "vqvae_modify":
-        vae = VQVAE_modify(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta, gamma=config.vae_kl_weight,
+    elif config.algo == "CAAE":
+        vae = CAAE(latent_dim=config.vae_latent_dim, Encoder_hidden_dim=config.encoder_hidden_dim, action_dim=config.action_dim, alpha=config.vqvae_alpha, beta=config.vqvae_beta, gamma=config.vae_kl_weight,
                            discrete_policy=(config.env in DiscreteEnvNames), k=config.k_value if config.vqvae_codebook == -1 else config.vqvae_codebook,
                            attention=config.encoder_attention, encoder_heads=config.encoder_heads,
-                           use_sigma=config.vqvae_modify_use_sigma, method=config.vqvae_modify_sum_method,
+                           use_sigma=config.CAAE_use_sigma, method=config.CAAE_sum_method,
                            pre_process=config.encoder_attention_pre_process, pre_process_layers=config.encoder_attention_pre_process_layers)
     else:
         raise ValueError("Unknown algo: ", config.algo)
@@ -242,7 +242,7 @@ def train(config):
     rng, reparam_rng = jax.random.split(rng)
     if config.algo == "vae":
         network_params = vae.init(init_rng, ac_init_in, init_act, reparam_rng)
-    elif config.algo == "vqvae" or config.algo == "vqvae_modify":
+    elif config.algo == "vqvae" or config.algo == "CAAE":
         network_params = vae.init(init_rng, ac_init_in, init_act)
     elif config.algo == "vqvae_gumble_softmax":
         network_params = vae.init(init_rng, ac_init_in, init_act, reparam_rng, 0)
@@ -298,7 +298,7 @@ def train(config):
                     kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
                     print(action.shape)
                     return recon_loss + config.vae_kl_weight * kl_loss.mean()
-                elif method == 'vqvae' or method == 'vqvae_modify':
+                elif method == 'vqvae' or method == 'CAAE':
                     pi, z, loss = vae.apply(params, (obs, done), action)
                     recon_loss = -pi.log_prob(action)
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
@@ -343,7 +343,7 @@ def train(config):
             std = jnp.exp(0.5 * log_var)
             eps = jax.random.normal(rng, mu.shape)
             return mu + eps * std
-        elif method == 'vqvae' or method == 'vqvae_modify':
+        elif method == 'vqvae' or method == 'CAAE':
             pi, z, loss = vae.apply(params, x, act)
             # (obs, done) = x
             # done_mask = jnp.cumprod(1 - done.astype(jnp.int32), axis=0)

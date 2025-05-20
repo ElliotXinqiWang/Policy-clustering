@@ -538,7 +538,7 @@ class VQVAE(nn.Module):
         print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
         return pi, z, loss
-class VQVAE_modify(nn.Module):
+class CAAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
     action_dim: int
@@ -623,7 +623,7 @@ class VQVAE_modify(nn.Module):
         pi = self.decoder(z, x)  # Decode
         return pi, z, loss
     
-class VQVAE_modify_few_sample(nn.Module):
+class CAAE_few_sample(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int
     action_dim: int

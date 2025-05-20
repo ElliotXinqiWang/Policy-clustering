@@ -11,9 +11,9 @@ random.seed()
 # print(sys.argv)
 # exit(0)
 algo=sys.argv[1]
-# algo="vqvae_modify"
-# algo="vqvae_modify_few_sample"
-# algo="vqvae_modify_self_train"
+# algo="CAAE"
+# algo="CAAE_few_sample"
+# algo="CAAE_self_train"
 # algo="vqvae"
 # algo="vqvae"
 # algo="vae"
@@ -22,9 +22,9 @@ algo=sys.argv[1]
 # project="vae_v1.24"
 if algo=="DEC":
     origin_path="algos/DEC.py"
-elif algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
+elif algo=="CAAE_few_sample" or algo=="CAAE_self_train":
     origin_path="algos/VAE_few_sample.py"
-elif algo=="vqvae_modify" or algo=="vqvae" or algo=='vae':
+elif algo=="CAAE" or algo=="vqvae" or algo=='vae':
     origin_path="algos/VAE_kmeans.py"
 elif algo=="SORL":
     origin_path="algos/SORL.py"
@@ -55,8 +55,8 @@ encoder_heads=2
 project="test_k"
 # project="LORA_v1"
 batch_size=512
-vqvae_modify_use_sigma=False
-vqvae_modify_sum_method="max"
+CAAE_use_sigma=False
+CAAE_sum_method="max"
 encoder_attention_pre_process="rnn"
 encoder_attention_pre_process_layers=1
 true_k_available=True
@@ -95,7 +95,7 @@ if algo=="SORL":
     encoder_attention=False
     batch_size=1024
     k_value=6
-true_k_available=False
+true_k_available=True
 
 for env_name in envs:
 #  k_start=4
@@ -152,8 +152,8 @@ for env_name in envs:
         return mi*math.exp(random.random()*math.log(mx/mi))
     def rand_hypers():
         global seed,codebook,vqvae_beta,vqvae_alpha,encoder_attention,encoder_hidden_dim, algo
-        global encoder_heads,learning_rate,vqvae_modify_use_sigma, vqvae_modify_sum_method, encoder_attention_pre_process, encoder_attention_pre_process_layers
-        # algo=random.choice(["vqvae","vqvae_modify","vqvae_modify","vqvae_modify"])
+        global encoder_heads,learning_rate,CAAE_use_sigma, CAAE_sum_method, encoder_attention_pre_process, encoder_attention_pre_process_layers
+        # algo=random.choice(["vqvae","CAAE","CAAE","CAAE"])
         seed = random.randint(0,2**30-1)
         # codebook = 2**random.randint(3,6)
         # vqvae_beta = log_uniform(0.5,2)
@@ -167,9 +167,9 @@ for env_name in envs:
             #     encoder_heads = 1
             # encoder_attention_pre_process_layers=random.randint(0,3)
             pass
-        if algo=="vqvae_modify":
-            # vqvae_modify_use_sigma = random.choice([True,False])
-            # vqvae_modify_sum_method = random.choice(["max","sum"])
+        if algo=="CAAE":
+            # CAAE_use_sigma = random.choice([True,False])
+            # CAAE_sum_method = random.choice(["max","sum"])
             pass
         # learning_rate = log_uniform(1e-4,1e-2)
         # learning_rate = random.choice([5e-3,5e-4,5e-5])
@@ -182,10 +182,10 @@ for env_name in envs:
         command+=f"--seed {seed} "
         command+=f"--project {project} "
         command+=f"--max_updates {max_updates} "
-        if algo=="vqvae" or algo=="vqvae_modify" or algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
+        if algo=="vqvae" or algo=="CAAE" or algo=="CAAE_few_sample" or algo=="CAAE_self_train":
             command+=f"--vqvae_codebook {codebook} "
             command+=f"--vqvae_alpha {vqvae_alpha} "
-        if algo=="vqvae" or algo=="vqvae_modify":
+        if algo=="vqvae" or algo=="CAAE":
             command+=f"--vqvae_beta {vqvae_beta} "
         command+=f"--algo {algo} "
         command+=f"--learning_rate {learning_rate} "
@@ -196,17 +196,17 @@ for env_name in envs:
             command+=f"--encoder_attention True "
             command+=f"--encoder_heads {encoder_heads} "
             command+=f"--encoder_hidden_dim {encoder_hidden_dim} "
-        if algo=="vqvae_modify" or algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
-            if vqvae_modify_use_sigma:
-                command+=f"--vqvae_modify_use_sigma True "
+        if algo=="CAAE" or algo=="CAAE_few_sample" or algo=="CAAE_self_train":
+            if CAAE_use_sigma:
+                command+=f"--CAAE_use_sigma True "
             command+=f"--encoder_attention_pre_process {encoder_attention_pre_process} "
             if encoder_attention_pre_process=="self_attention":
                 command+=f"--encoder_attention_pre_process_layers {encoder_attention_pre_process_layers} "
-        if algo=="vqvae_modify":
-            command+=f"--vqvae_modify_sum_method {vqvae_modify_sum_method} "
+        if algo=="CAAE":
+            command+=f"--CAAE_sum_method {CAAE_sum_method} "
             command+=f"--lr_decay {lr_decay} --lr_decay_v1 {lr_decay_v1} --lr_decay_v2 {lr_decay_v2} --lr_decay_v3 {lr_decay_v3} "
             command+=f"--vae_kl_weight {vae_kl_weight} "
-        if algo=="vqvae_modify_few_sample" or algo=="vqvae_modify_self_train":
+        if algo=="CAAE_few_sample" or algo=="CAAE_self_train":
             command+=f"--supervise_sample {supervise_sample} "
         if true_k_available:
             command+=f"--true_k_available True "
