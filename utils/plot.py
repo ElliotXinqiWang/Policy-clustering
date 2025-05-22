@@ -67,32 +67,32 @@ result_dict = {"Diagonal": Diagonal,
                "Walker2d": Walker2d}
 
 
-def plot_multiple_lines(data, labels=None, title="多组数据折线图", xlabel="X轴", ylabel="Y轴", 
+def plot_multiple_lines(data, labels=None, title="", xlabel="X", ylabel="Y", 
                         line_styles=None, markers=None, colors=None, grid=True, filename="plot.png"):
     """
-    绘制多组数据的折线图。
+    。
 
-    参数:
-        data (list of tuple): 数据列表，每个元素是一个 (x, y) 元组。
-                              例如: [([1, 2, 3], [2, 4, 6]), ([1, 2, 3], [3, 6, 9])]
-        labels (list of str): 每组数据的标签，用于图例。如果为 None，则不显示图例。
-        title (str): 图表标题。
-        xlabel (str): X 轴标签。
-        ylabel (str): Y 轴标签。
-        line_styles (list of str): 每组线条的样式 (例如: "-", "--")，默认均为实线。
-        markers (list of str): 每组数据点的标记样式 (例如: "o", "s")，默认没有标记。
-        colors (list of str): 每组线条的颜色 (例如: "b", "r")，默认自动分配颜色。
-        grid (bool): 是否显示网格。
+    :
+        data (list of tuple): ， (x, y) 。
+                              : [([1, 2, 3], [2, 4, 6]), ([1, 2, 3], [3, 6, 9])]
+        labels (list of str): ，。 None，。
+        title (str): 。
+        xlabel (str): X 。
+        ylabel (str): Y 。
+        line_styles (list of str):  (: "-", "--")，。
+        markers (list of str):  (: "o", "s")，。
+        colors (list of str):  (: "b", "r")，。
+        grid (bool): 。
 
-    返回:
+    :
         None
     """
     plt.figure(figsize=(8, 6))
     
-    # 检查参数长度
+    # 
     num_lines = len(data)
     if labels is None:
-        labels = [f"数据 {i+1}" for i in range(num_lines)]
+        labels = [f" {i+1}" for i in range(num_lines)]
     if line_styles is None:
         line_styles = ["-"] * num_lines
     if markers is None:
@@ -101,7 +101,7 @@ def plot_multiple_lines(data, labels=None, title="多组数据折线图", xlabel
         colors = [None] * num_lines
 
     
-    # 绘制每组数据
+    # 
     for i, (x, y) in enumerate(data):
         # filter out the None values
         x, y = zip(*[(xi, yi) for xi, yi in zip(x, y) if yi is not None])
@@ -124,7 +124,7 @@ def plot_multiple_lines(data, labels=None, title="多组数据折线图", xlabel
     plt.savefig(filename, bbox_inches="tight")
     print(f"Saved the PNG to {filename}")
 
-# 示例用法
+# 
 if __name__ == "__main__":
     # env_name = "Diagonal"
     # env_name = "Takeball"

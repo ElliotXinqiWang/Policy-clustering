@@ -91,7 +91,7 @@ class Transitions(NamedTuple):
 def parse_args_and_update_config(config_class):
     parser = argparse.ArgumentParser()
 
-    # 遍历 dataclass 的字段，根据其类型动态添加参数
+    #  dataclass ，
     for field_name, field_info in config_class.__dataclass_fields__.items():
         default = field_info.default
         if isinstance(default, (int, float, str, bool)):
@@ -99,10 +99,10 @@ def parse_args_and_update_config(config_class):
         elif default is None:
             parser.add_argument(f"--{field_name}", type=str, default=None, help="Default: None")
 
-    # 解析命令行参数
+    # 
     args = parser.parse_args()
 
-    # 使用命令行参数覆盖默认配置
+    # 
     kwargs = vars(args)
     config = config_class(**kwargs)
     return config

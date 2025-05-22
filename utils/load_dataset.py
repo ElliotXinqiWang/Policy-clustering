@@ -177,7 +177,7 @@ def load(config, dropout=0):
         plt.legend()
         plt.savefig(f"{config.env}.png")
 
-        if "expert" in config.env:  # 如果是 medium-expert 数据集
+        if "expert" in config.env:  #  medium-expert 
             medium_avg = cumsum_returns / jnp.arange(1, len(returns) + 1)
             total_sum = cumsum_returns[-1]
             expert_avg = (total_sum - cumsum_returns[:-1]) / jnp.arange(len(returns) - 1, 0, -1)

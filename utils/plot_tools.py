@@ -108,30 +108,30 @@ def plot_and_save_bars(data_group, categories, title, xlabel, ylabel, labels=Non
 
 def plot_and_save_heatmap(matrix, save_path=None):
     K, L = matrix.shape
-    fig, ax = plt.subplots(figsize=(L + 2, K + 2), constrained_layout=True)  # 调整图像尺寸
+    fig, ax = plt.subplots(figsize=(L + 2, K + 2), constrained_layout=True)  # 
     
-    # 绘制热图
+    # 
     cax = ax.matshow(matrix, cmap="coolwarm")
     plt.colorbar(cax, ax=ax)
 
-    # 设置行和列的标签
+    # 
     ax.set_xticks(range(L))
     ax.set_yticks(range(K))
-    ax.set_xticklabels(range(L))  # 列标签 0 ～ L-1
-    ax.set_yticklabels(range(K))  # 行标签 0 ～ K-1
+    ax.set_xticklabels(range(L))  #  0 ～ L-1
+    ax.set_yticklabels(range(K))  #  0 ～ K-1
 
-    # 添加行标题和列标题
+    # 
     ax.set_xlabel("ground truth idx", fontsize=12, labelpad=10)
     ax.set_ylabel("dataset idx", fontsize=12, labelpad=10)
 
-    # 在每个格子上标注数值
+    # 
     for i in range(K):
         for j in range(L):
             ax.text(j, i, str(int(matrix[i, j])), 
                     ha='center', va='center', color='black', fontsize=8,
                     bbox=dict(facecolor='white', edgecolor='none', pad=0.2))
 
-    # 添加标题
+    # 
     plt.title("Heatmap of Matrix", pad=20)
     plt.show()
      # save the plot to a buffer

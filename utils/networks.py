@@ -754,7 +754,7 @@ class ClusteringLayer(nn.Module):
     Output: q (batch_size, n_clusters)
     """
     def __call__(self, z):
-        # 计算 q_ij
+        #  q_ij
         q = 1.0 / (1.0 + jnp.sum((z[:, None, :] - self.centers[None, :, :]) ** 2, axis=2))
         q = q / jnp.sum(q, axis=1, keepdims=True)
         return q
