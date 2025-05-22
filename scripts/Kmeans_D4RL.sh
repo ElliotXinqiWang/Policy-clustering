@@ -13,7 +13,7 @@ dataset="medium-expert"
 
 # Kvalues=(2 3 4 6 8 10 12 15)
 Kvalues=(3)
-seeds=(0)
+seeds=(0 1 2 3 4)
 # seeds=(0 1 2 3 4 5 6 7 8 9)
 SELECTED_GPU=$(python scripts/select_gpu.py)
 echo "Selected GPU: $SELECTED_GPU"

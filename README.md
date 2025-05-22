@@ -2,7 +2,7 @@
 
 Use `python run.py <algo> <env>` to run our codes.
 
-`<algo>` in: PG-Kmeans, VAE, DEV, CAAE. The PG-Kmeans don't include Best-of-5, you should run it 5 times and pick the run that has lowerest $J$.
+`<algo>` in: PG-Kmeans, VAE, DEV, CAAE. PG-Kmeans does not support Best-of-5 by default. You need to manually execute it 5 times(with different seeds, the default implementation mentioned below will help you) and choose the run yielding the minimal $J$."
 
 `<env>` in: halfcheetah, ant, walker2d, hopper, diagonal, takeball, pathfollowing, extra.
 
