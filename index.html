@@ -6,20 +6,37 @@
   <title>Policy Clustering in Offline RL</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-green-50 text-gray-800">
-  <main class="max-w-4xl mx-auto px-6 py-12 space-y-16">
+<body class="bg-gradient-to-b from-green-100 to-green-50 text-gray-800 relative">
+  <!-- Corner logos -->
+  <div class="absolute top-4 right-4 flex gap-3">
+    <img src="images/UW.png" alt="UW logo" class="h-10" />
+    <img src="images/tsinghua.png" alt="Tsinghua logo" class="h-10" />
+  </div>
+
+  <nav class="fixed top-0 left-0 w-full bg-white bg-opacity-90 backdrop-blur shadow z-50">
+  <div class="max-w-4xl mx-auto px-6 py-3 flex justify-between items-center">
+    <span class="font-bold text-lg">Policy Clustering</span>
+    <div class="space-x-4 text-sm">
+      <a href="#overview" class="hover:underline text-blue-600">Overview</a>
+      <a href="#methods" class="hover:underline text-blue-600">Methods</a>
+      <a href="#environment" class="hover:underline text-blue-600">Environment</a>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-4xl mx-auto px-6 py-24 space-y-16">
     <!-- Header -->
     <section class="text-center">
       <h1 class="text-5xl font-extrabold tracking-tight">Policy-Based Trajectory Clustering</h1>
-      <p class="text-lg text-gray-600 mt-2">Xinqi Wang, Yifeng Zeng, Hanzhang Xu, Linxi Fan</p>
-      <div class="mt-4 flex justify-center gap-6">
-        <img src="images/UW.png" alt="UW logo" class="h-12" />
-        <img src="images/tsinghua.png" alt="Tsinghua logo" class="h-12" />
-      </div>
+      <p class="text-lg text-gray-600 mt-2">Xinqi Wang, Hao Hu, Simon S. Du</p>
+<div class="mt-4 flex flex-wrap justify-center gap-4">
+  <a href="https://arxiv.org/pdf/2506.09202" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">ArXiv Paper</a>
+  <a href="https://github.com/ElliotXinqiWang/Policy-clustering" target="_blank" class="bg-gray-200 px-4 py-2 rounded-md shadow hover:bg-gray-300">GitHub Repo</a>
+</div>
     </section>
 
     <!-- Overview -->
-    <section class="space-y-4">
+    <section id="overview" class="space-y-4">
       <h2 class="text-3xl font-semibold">🌌 What is Policy Clustering and Why Does It Matter?</h2>
       <p>
         Policy clustering provides a principled framework to disentangle heterogeneous behaviors in offline RL datasets. Instead of treating the dataset as a monolithic block, we recognize the multiple policies behind the trajectories and aim to partition them accordingly. This clustering can improve generalization, facilitate imitation learning, and support downstream analyses. It also aligns with the intuition that data collected from different decision makers may follow qualitatively different strategies.
@@ -29,13 +46,10 @@
         <li>Enhances interpretability of policy behaviors for debugging and refinement.</li>
         <li>Supports semi-supervised fine-tuning on limited labeled trajectories.</li>
       </ul>
-      <div class="mt-4">
-        <img src="placeholder_overview.png" alt="Illustration: Concept of Policy Clustering" class="rounded-lg shadow-md w-full max-w-3xl mx-auto" />
-      </div>
     </section>
 
     <!-- Methods -->
-    <section class="space-y-4">
+    <section id="methods" class="space-y-4">
       <h2 class="text-3xl font-semibold">🔹 Two Methods Overview</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
@@ -47,42 +61,65 @@
         <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
           <h3 class="text-xl font-semibold mb-2">CAAE</h3>
           <p class="text-center">Inspired by VQ-VAE, this method learns latent representations of trajectories and attracts them to Gaussian centers for clustering.</p>
-          <img src="images/CAAE.png" alt="CAAE Method Diagram" class="mt-4 rounded-md" />
+          <img src="images/CAAE.png" alt="CAAE Method Diagram" class="mt-4 rounded-md hover:shadow-lg transition duration-200 cursor-pointer" onclick="openModal(this.src)" />
         </div>
       </div>
     </section>
 
     <!-- Environment -->
-    <section class="space-y-4">
+    <section id="environment" class="space-y-4">
       <h2 class="text-3xl font-semibold">📊 Environment Overview</h2>
-      <p>We validate our methods on the D4RL benchmarks and a custom GridWorld environment:</p>
+      <p>We validate our methods in GridWorld environments with multiple distinct strategies, each representing a different policy preference:</p>
       <div class="mt-4 flex flex-col items-center">
-        <img src="images/strategies.png" alt="Dataset Illustration" class="rounded-lg shadow-md w-full max-w-3xl" />
+        <img src="images/strategies.png" alt="GridWorld policy strategies" class="rounded-lg shadow-md w-full max-w-3xl hover:shadow-xl transition duration-200 cursor-pointer" onclick="openModal(this.src)" />
       </div>
-      <p class="text-gray-600 italic">Example: D4RL Medium-Expert dataset with mixed trajectories collected from multiple policies.</p>
+      <p class="text-gray-600 italic">We designed multiple environments, each with several expert policies (represented by different colored arrows). Each environment contains significant random noise. An ideal policy clustering algorithm should cluster based on the generating policy, rather than the randomness of transitions.</p>
     </section>
 
     <!-- Resources -->
-    <section class="text-center space-y-4">
-      <h2 class="text-3xl font-semibold">🔗 Resources & References</h2>
-      <div class="flex flex-wrap justify-center gap-4">
-        <a href="https://arxiv.org/pdf/2506.09202" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">ArXiv Paper</a>
-        <a href="https://github.com/ElliotXinqiWang/Policy-clustering" target="_blank" class="bg-gray-200 px-4 py-2 rounded-md shadow hover:bg-gray-300">GitHub Repo</a>
-      </div>
-      <pre class="text-left bg-gray-100 p-4 rounded-lg overflow-auto max-h-48 text-sm">
-@article{wang2025policy,
-  title={Policy-Based Trajectory Clustering in Offline Reinforcement Learning},
-  author={Wang, Xinqi and ...},
-  journal={NeurIPS},
-  year={2025}
-}
-      </pre>
-    </section>
+    
 
     <!-- Footer -->
     <footer class="text-center text-sm text-gray-500 pt-16 pb-6">
-      © 2025 Xinqi Wang — Made with 🐧 in Seattle
-    </footer>
+  © 2025 Xinqi Wang — Made with 🐧 in Seattle
+  <p class="mt-4 text-gray-500">Contact: <a href="mailto:wxqkaxdd@cs.washington.edu" class="text-blue-600 hover:underline">wxqkaxdd@cs.washington.edu</a></p>
+  <div class="mt-6 max-w-xl mx-auto">
+    <h3 class="text-base font-semibold mb-2">📎 BibTeX</h3>
+    <div class="relative">
+      <pre id="bibtex" class="text-left bg-gray-100 p-4 rounded-lg overflow-auto text-sm">@article{wang2025policy,
+  title={Policy-Based Trajectory Clustering in Offline Reinforcement Learning},
+  author={Wang, Xinqi and Hu, Hao and Du, Simon S.},
+  journal={NeurIPS},
+  year={2025}
+}</pre>
+      <button onclick="copyBibtex()" class="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 text-xs rounded hover:bg-blue-700">Copy</button>
+    </div>
+  </div>
+</footer>
   </main>
+<!-- Modal -->
+<div id="imageModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-50" onclick="closeModal()">
+  <img id="modalImage" src="" class="max-h-full max-w-full rounded-lg border-4 border-white shadow-2xl" onclick="event.stopPropagation()">
+</div>
+
+<script>
+  function openModal(src) {
+    const modal = document.getElementById('imageModal');
+    const img = document.getElementById('modalImage');
+    img.src = src;
+    modal.classList.remove('hidden');
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('imageModal');
+    modal.classList.add('hidden');
+  }
+  function copyBibtex() {
+    const text = document.getElementById("bibtex").innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("BibTeX copied to clipboard!");
+    });
+  }
+</script>
 </body>
 </html>
