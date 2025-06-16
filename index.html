@@ -8,72 +8,74 @@
 </head>
 <body class="bg-green-50 text-gray-800">
   <main class="max-w-4xl mx-auto px-6 py-12 space-y-16">
+    <!-- Header -->
     <section class="text-center">
       <h1 class="text-5xl font-extrabold tracking-tight">Policy-Based Trajectory Clustering</h1>
       <p class="text-lg text-gray-600 mt-2">NeurIPS 2025 Submission by Xinqi Wang et al.</p>
     </section>
 
+    <!-- Overview -->
     <section class="space-y-4">
-      <h2 class="text-3xl font-semibold">🌌 Overview</h2>
+      <h2 class="text-3xl font-semibold">🌌 What is Policy Clustering and Why Does It Matter?</h2>
       <p>
-        We propose a novel task in offline reinforcement learning: clustering trajectories by the policies that generated them.
+        Policy clustering is a technique in offline reinforcement learning that groups trajectories based on the policies that generated them.
+        Different policies can produce vastly different behaviors, and separating them can improve learning efficiency and interpretability.
       </p>
       <ul class="list-disc list-inside ml-4">
-        <li><strong>PG-Kmeans:</strong> EM-style clustering with policy networks.</li>
-        <li><strong>CAAE:</strong> VQ-VAE-inspired latent space clustering.</li>
+        <li>Reduces interference from suboptimal policies, improving stability.</li>
+        <li>Enhances interpretability of policy behaviors for debugging and refinement.</li>
+        <li>Supports semi-supervised fine-tuning on limited labeled trajectories.</li>
       </ul>
-    </section>
-
-    <section class="space-y-4">
-      <h2 class="text-3xl font-semibold">💡 Why Policy Clustering Matters</h2>
-      <p>
-        In offline reinforcement learning (RL), trajectory data is typically collected from a mix of unknown or partially known policies — agents with different levels of skill, intent, or exploration strategy.
-      </p>
-      <ul class="list-disc list-inside ml-4">
-        <li><strong>Suboptimal Policy Aggregation:</strong> Mixing trajectories from distinct policies can confuse learning algorithms, leading to unstable updates or policy collapse.</li>
-        <li><strong>Lack of Interpretability:</strong> Without understanding who did what, it’s hard to debug or make sense of policy decisions from data alone.</li>
-      </ul>
-      <p>
-        Our work addresses this by clustering trajectories by their generating policies. This idea allows us to:
-      </p>
-      <ul class="list-disc list-inside ml-4">
-        <li>Group behaviorally similar agents together, reducing noise and improving learning efficiency.</li>
-        <li>Enable semi-supervised labeling or fine-tuning within clusters.</li>
-        <li>Discover hidden behavior modes (explorers, experts, subpolicies).</li>
-        <li>Unify clustering, imitation learning, and generative modeling in one framework.</li>
-      </ul>
-      <p>
-        In short, policy clustering transforms the passive dataset into an active tool — one that structures and reveals the latent strategies hidden within RL behavior.
-      </p>
-    </section>
-
-    <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="p-6 bg-white shadow-md rounded-xl">
-        <h3 class="text-xl font-semibold mb-2">🔹 PG-Kmeans</h3>
-        <p>Iteratively trains behavior cloning policies and clusters based on action likelihoods. Guarantees finite-step convergence.</p>
-      </div>
-      <div class="p-6 bg-white shadow-md rounded-xl">
-        <h3 class="text-xl font-semibold mb-2">🔹 CAAE</h3>
-        <p>Learns latent representations attracted to Gaussian centroids. Efficient and robust under stochastic environments.</p>
+      <div class="mt-4">
+        <img src="placeholder_overview.png" alt="Illustration: Concept of Policy Clustering" class="rounded-lg shadow-md w-full max-w-3xl mx-auto" />
       </div>
     </section>
 
+    <!-- Methods -->
     <section class="space-y-4">
-      <h2 class="text-3xl font-semibold">📊 Results</h2>
-      <p>
-        Our methods outperform conventional clustering (DEC, VAE+KMeans) and SORL across D4RL and custom GridWorld tasks.
-      </p>
-      <img src="placeholder_results.png" alt="Results Table" class="rounded-lg shadow-md border w-full max-w-3xl mx-auto"/>
+      <h2 class="text-3xl font-semibold">🔹 Two Methods Overview</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
+          <h3 class="text-xl font-semibold mb-2">PG-Kmeans</h3>
+          <p class="text-center">An EM-style clustering approach that alternates between training behavior cloning policies and assigning trajectories based on action likelihoods.</p>
+          <img src="placeholder_pgkmeans.png" alt="PG-Kmeans Method Diagram" class="mt-4 rounded-md" />
+        </div>
+        <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
+          <h3 class="text-xl font-semibold mb-2">CAAE</h3>
+          <p class="text-center">Inspired by VQ-VAE, this method learns latent representations of trajectories and attracts them to Gaussian centers for clustering.</p>
+          <img src="placeholder_caae.png" alt="CAAE Method Diagram" class="mt-4 rounded-md" />
+        </div>
+      </div>
     </section>
 
+    <!-- Environment -->
+    <section class="space-y-4">
+      <h2 class="text-3xl font-semibold">📊 Environment Overview</h2>
+      <p>We validate our methods on the D4RL benchmarks and a custom GridWorld environment:</p>
+      <div class="mt-4 flex flex-col items-center">
+        <img src="placeholder_dataset.png" alt="Dataset Illustration" class="rounded-lg shadow-md w-full max-w-3xl" />
+      </div>
+      <p class="text-gray-600 italic">Example: D4RL Medium-Expert dataset with mixed trajectories collected from multiple policies.</p>
+    </section>
+
+    <!-- Resources -->
     <section class="text-center space-y-4">
-      <h2 class="text-3xl font-semibold">🔗 Resources</h2>
+      <h2 class="text-3xl font-semibold">🔗 Resources & References</h2>
       <div class="flex flex-wrap justify-center gap-4">
         <a href="https://arxiv.org/pdf/2506.09202" target="_blank" class="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700">ArXiv Paper</a>
         <a href="https://github.com/ElliotXinqiWang/Policy-clustering" target="_blank" class="bg-gray-200 px-4 py-2 rounded-md shadow hover:bg-gray-300">GitHub Repo</a>
       </div>
+      <pre class="text-left bg-gray-100 p-4 rounded-lg overflow-auto max-h-48 text-sm">
+@article{wang2025policy,
+  title={Policy-Based Trajectory Clustering in Offline Reinforcement Learning},
+  author={Wang, Xinqi and ...},
+  journal={NeurIPS},
+  year={2025}
+}
+      </pre>
     </section>
 
+    <!-- Footer -->
     <footer class="text-center text-sm text-gray-500 pt-16 pb-6">
       © 2025 Xinqi Wang — Made with 🐧 in Seattle
     </footer>
