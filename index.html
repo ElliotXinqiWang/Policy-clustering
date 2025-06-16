@@ -11,15 +11,18 @@
     <!-- Header -->
     <section class="text-center">
       <h1 class="text-5xl font-extrabold tracking-tight">Policy-Based Trajectory Clustering</h1>
-      <p class="text-lg text-gray-600 mt-2">NeurIPS 2025 Submission by Xinqi Wang et al.</p>
+      <p class="text-lg text-gray-600 mt-2">Xinqi Wang, Yifeng Zeng, Hanzhang Xu, Linxi Fan</p>
+      <div class="mt-4 flex justify-center gap-6">
+        <img src="images/UW.png" alt="UW logo" class="h-12" />
+        <img src="images/tsinghua.png" alt="Tsinghua logo" class="h-12" />
+      </div>
     </section>
 
     <!-- Overview -->
     <section class="space-y-4">
       <h2 class="text-3xl font-semibold">🌌 What is Policy Clustering and Why Does It Matter?</h2>
       <p>
-        Policy clustering is a technique in offline reinforcement learning that groups trajectories based on the policies that generated them.
-        Different policies can produce vastly different behaviors, and separating them can improve learning efficiency and interpretability.
+        Policy clustering provides a principled framework to disentangle heterogeneous behaviors in offline RL datasets. Instead of treating the dataset as a monolithic block, we recognize the multiple policies behind the trajectories and aim to partition them accordingly. This clustering can improve generalization, facilitate imitation learning, and support downstream analyses. It also aligns with the intuition that data collected from different decision makers may follow qualitatively different strategies.
       </p>
       <ul class="list-disc list-inside ml-4">
         <li>Reduces interference from suboptimal policies, improving stability.</li>
@@ -37,13 +40,14 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
           <h3 class="text-xl font-semibold mb-2">PG-Kmeans</h3>
-          <p class="text-center">An EM-style clustering approach that alternates between training behavior cloning policies and assigning trajectories based on action likelihoods.</p>
-          <img src="placeholder_pgkmeans.png" alt="PG-Kmeans Method Diagram" class="mt-4 rounded-md" />
+          <p class="text-center">
+            We adopt an EM-style algorithm that alternates between policy training and assignment. In the E-step, trajectories are clustered using action likelihoods under different policies. In the M-step, each cluster's policy is refined by behavior cloning. The algorithm gradually sharpens the cluster-policy alignment.
+          </p>
         </div>
         <div class="p-6 bg-white shadow-md rounded-xl flex flex-col items-center">
           <h3 class="text-xl font-semibold mb-2">CAAE</h3>
           <p class="text-center">Inspired by VQ-VAE, this method learns latent representations of trajectories and attracts them to Gaussian centers for clustering.</p>
-          <img src="placeholder_caae.png" alt="CAAE Method Diagram" class="mt-4 rounded-md" />
+          <img src="images/CAAE.png" alt="CAAE Method Diagram" class="mt-4 rounded-md" />
         </div>
       </div>
     </section>
@@ -53,7 +57,7 @@
       <h2 class="text-3xl font-semibold">📊 Environment Overview</h2>
       <p>We validate our methods on the D4RL benchmarks and a custom GridWorld environment:</p>
       <div class="mt-4 flex flex-col items-center">
-        <img src="placeholder_dataset.png" alt="Dataset Illustration" class="rounded-lg shadow-md w-full max-w-3xl" />
+        <img src="images/strategies.png" alt="Dataset Illustration" class="rounded-lg shadow-md w-full max-w-3xl" />
       </div>
       <p class="text-gray-600 italic">Example: D4RL Medium-Expert dataset with mixed trajectories collected from multiple policies.</p>
     </section>
