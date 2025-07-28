@@ -83,6 +83,60 @@ def continuous_dataset_to_trajectories(dataset, max_traj_len=20):
             
     return Transitions(jnp.array(obs), jnp.array(action), jnp.array(reward), jnp.array(done))
 
+def dataset_to_trajectories(dataset, max_traj_len=1000):
+    """
+    Dataset is a dictionary with keys: observations, actions, rewards, terminals, timeouts
+    dataset['obs'] is of shape (num_traj * max_traj_len, obs_dim)
+    Convert the dataset to a Transition 
+    where obs shape is (num_traj, max_traj_len, obs_dim)
+    Args:
+        dataset (_type_): the dataset to convert
+        max_traj_len (_type_): the maximum length of the trajectories. set tobe 1000 by defaulf for mujoco envs.
+    Returns:
+        trajectories (_type_): the Transition
+    """
+    start_idx = 0
+    start_is_done = True
+    obs = []
+    action = []
+    reward = []
+    done = []
+    # print the keys of the dataset
+    # print("Dataset keys", dataset.keys())
+    # see if all the terminals are False
+    print("All terminals are False?", not any(dataset['terminals']))
+    # a Traj is done when timeout or terminal is True
+    if 'timeouts' not in dataset:
+        dataset['timeouts'] = jnp.zeros_like(dataset['terminals'])
+    dones = dataset['terminals'] | dataset['timeouts']
+    with tqdm.tqdm(total=len(dataset['terminals'])) as pbar:
+        for i in range(len(dataset['terminals'])):
+            pbar.update(1)
+            if i - start_idx == max_traj_len - 1 or dones[i]:
+                if not start_is_done:
+                    start_idx = i + 1
+                    start_is_done = True
+                    continue
+                else:
+                    obs.append(dataset['observations'][start_idx:i+1])
+                    action.append(dataset['actions'][start_idx:i+1])
+                    reward.append(dataset['rewards'][start_idx:i+1])
+                    done.append(dones[start_idx:i+1])
+                    # make sure the last done is True for each traj
+                    done[-1].at[-1].set(True)
+                    
+                    start_idx = i + 1
+                    start_is_done = dones[i]
+    
+    # pad all the trajs to the same length. pad dones with 1
+    max_len = max([len(obs[i]) for i in range(len(obs))])
+    obs = [jnp.pad(obs[i], ((0, max_len - len(obs[i])), (0, 0))) for i in range(len(obs))]
+    action = [jnp.pad(action[i], ((0, max_len - len(action[i])), (0, 0))) for i in range(len(action))]
+    reward = [jnp.pad(reward[i], ((0, max_len - len(reward[i])))) for i in range(len(reward))]
+    done = [jnp.pad(done[i], ((0, max_len - len(done[i]))), constant_values=False) for i in range(len(done))]
+            
+    return Transitions(jnp.array(obs), jnp.array(action), jnp.array(reward), jnp.array(done))
+
 def load_rule_based_datasets(config):  
     rule_based_dataset_files = config.rule_based_dataset_files
     datasets = []
@@ -157,13 +211,29 @@ def load(config, dropout=0):
     D4RL_envs = ["halfcheetah-medium-expert-v2","walker2d-medium-expert-v2","hopper-medium-expert-v2","ant-medium-expert-v2","halfcheetah-medium-replay-v2"]
 
     if config.env in D4RL_envs:
-        print("Load dataset from local: ", f"datasets/{config.env}.hdf5")
-        with h5py.File(f"datasets/{config.env}.hdf5", "r") as f:
-            obs = jnp.array(f["obs"][:])
-            action = jnp.array(f["action"][:])
-            reward = jnp.array(f["reward"][:])
-            done = jnp.array(f["done"][:])
-        dataset = Transitions(obs, action, reward, done)
+        if os.path.exists(f"datasets/{config.env}.hdf5"):
+            print("Load dataset from local: ", f"datasets/{config.env}.hdf5")
+            with h5py.File(f"datasets/{config.env}.hdf5", "r") as f:
+                obs = jnp.array(f["obs"][:])
+                action = jnp.array(f["action"][:])
+                reward = jnp.array(f["reward"][:])
+                done = jnp.array(f["done"][:])
+            dataset = Transitions(obs, action, reward, done)
+        else:
+            env = gym.make(config.env)
+            print("Load dataset from d4rl")
+            dataset = d4rl.qlearning_dataset(env)
+            print("first 10 teriminals", dataset['terminals'][:10])
+            dataset = dataset_to_trajectories(dataset, config.max_traj_len)
+            # save dataset to local
+            if not os.path.exists(f"datasets/{config.env}.hdf5"):
+                os.makedirs("datasets", exist_ok=True)
+            print("Save dataset to local: ", f"datasets/{config.env}.hdf5")
+            with h5py.File(f"datasets/{config.env}.hdf5", "w") as f:
+                f.create_dataset("obs", data=np.array(dataset.obs))
+                f.create_dataset("action", data=np.array(dataset.action))
+                f.create_dataset("reward", data=np.array(dataset.reward))
+                f.create_dataset("done", data=np.array(dataset.done))
         returns = dataset.reward.sum(axis=1)
         cumsum_returns = jnp.cumsum(returns)
 

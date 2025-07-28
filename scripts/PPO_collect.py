@@ -8,7 +8,7 @@ select_gpu_script = "scripts/select_gpu.py"
 selected_gpu = subprocess.check_output(["python", select_gpu_script]).decode("utf-8").strip()
 print(f"Selected GPU: {selected_gpu}")
 max_updates = "20000"
-train=True
+train=False
 collect=True
 
 for env_name in env_names:

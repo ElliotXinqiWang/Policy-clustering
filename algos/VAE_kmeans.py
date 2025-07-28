@@ -296,7 +296,7 @@ def train(config):
                     recon_loss = -pi.log_prob(action)
                     recon_loss = jnp.sum(done_mask * recon_loss, axis=(0, 1)) / jnp.sum(done_mask, axis=(0, 1))
                     kl_loss = mu ** 2 + jnp.exp(log_var) - log_var - 1
-                    print(action.shape)
+                    # print(action.shape)
                     return recon_loss + config.vae_kl_weight * kl_loss.mean()
                 elif method == 'vqvae' or method == 'CAAE':
                     pi, z, loss = vae.apply(params, (obs, done), action)
@@ -327,11 +327,31 @@ def train(config):
     
     loss_history = []
     for i in range(config.max_updates):
+        if (config.algo == "CAAE" or config.algo == "vqvae") and i%4==0 and False:
+            obs=jnp.swapaxes(dataset.obs, 0, 1)
+            done=jnp.swapaxes(dataset.done, 0, 1)
+            action=jnp.swapaxes(dataset.action, 0, 1)
+            # print(obs.shape, done.shape, action.shape)
+            pi,z,loss=vae.apply(train_state.params, (obs, done), action)
+            # print(z.shape)
+            from sklearn.manifold import TSNE
+            tsne = TSNE(n_components=2, perplexity=30, n_iter=300)
+            tsne_results = tsne.fit_transform(z)
+            plt.figure(figsize=(10, 8))
+            plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=data_idx, alpha=0.6, cmap='tab10')
+            plt.title("t-SNE Visualization")
+            plt.xlabel("t-SNE 1")
+            plt.ylabel("t-SNE 2")
+            # plt.savefig("tsne.png")
+            wandb.log({"t-SNE": wandb.Image(plt)}, step=i)
+            plt.close()
+            print("t-SNE visualization saved for update", i)
+            # exit(0)
         rng, update_rng = jax.random.split(rng)
         train_state, loss = epoch_step((train_state, dataset.obs, dataset.action, dataset.reward, dataset.done, update_rng), i, method=config.algo)
         loss_history.append(loss)
         print(f"Update {i}, Loss: {loss}")
-        wandb.log({"Loss": loss})
+        wandb.log({"Loss": loss}, step=i+1)
         if len(loss_history) > 10 and jnp.abs(loss - jnp.mean(jnp.array(loss_history[-10:]))) < 1e-5:
             break
     print("Training finished after ", i, " updates")
@@ -412,6 +432,18 @@ def train(config):
         print(" TQ: ", utils.stat.g(reward[dataset_idxs[i]], 0.99)/utils.stat.g(reward, 0.99))
         print(" SACo: ", utils.stat.u(obs[dataset_idxs[i]], action[dataset_idxs[i]])/utils.stat.u(obs, action))
         print(" Number of samples: ", len(dataset_idxs[i]))
+        dataset_i= Transitions(
+            obs=obs[dataset_idxs[i]],
+            action=action[dataset_idxs[i]],
+            reward=reward[dataset_idxs[i]],
+            done=dataset.done[dataset_idxs[i]]
+        )
+        from utils.save_dataset import convert_done_terminated_transitions
+        dataset_i=convert_done_terminated_transitions(dataset_i)
+        save_path=f"{config.env}-{i}.pkl"
+        with open(save_path, "wb") as f:
+            pickle.dump(dataset_i, f)
+        print(f"Dataset {i} saved to {save_path}")
 
 
 

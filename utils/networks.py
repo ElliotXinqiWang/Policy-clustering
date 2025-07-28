@@ -535,9 +535,9 @@ class VQVAE(nn.Module):
     def __call__(self, x, act):
         mu, log_var = self.encoder(x, act)  # Encode
         z, loss = self.reparameterize(mu)  # Reparameterization
-        print(mu.shape,z.shape)
+        # print(mu.shape,z.shape)
         pi = self.decoder(z, x)  # Decode
-        return pi, z, loss
+        return pi, mu, loss
 class CAAE(nn.Module):
     latent_dim: int
     Encoder_hidden_dim: int

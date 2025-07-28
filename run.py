@@ -16,7 +16,7 @@ envmap={
 env=env.lower()
 print(algo,env)
 
-if algo in ["SORL","CAAE","DEV","VAE"]:
+if algo in ["SORL","CAAE","DEC","VAE",'vqvae']:
 	command=f"python scripts/run.py {algo} {envmap[env]}"
 elif algo == "PG-Kmeans":
 	if env in ['halfcheetah','ant','walker2d','hopper']:

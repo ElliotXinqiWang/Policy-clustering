@@ -10,3 +10,7 @@ logs/
 nohup.out
 .nfs*
 *runtimecopy*.py
+*.pkl
+*.png
+*.zip
+*.gif
