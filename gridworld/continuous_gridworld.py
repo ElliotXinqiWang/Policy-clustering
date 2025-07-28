@@ -26,8 +26,6 @@ class SingleAgentEnv:
                  contact_force: float = 0.1,
                  noise_constant: float = 0.01):
         """Initialize a single-agent environment with optional barriers."""
-        print(max_steps)
-        exit(0)
         self.n_barriers = n_barriers
         self.max_steps = max_steps
         self.agent_size = agent_size
